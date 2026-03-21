@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VideoFormat {
+  UGC_REACTION
+  UGC_VOICEOVER
+  TALKING_HEAD
+  CAROUSEL_SLIDESHOW
+  SCREEN_RECORDING
+  SKIT_COMEDY
+  GREEN_SCREEN
+  TEXT_ON_SCREEN
+  INTERVIEW_PODCAST
+  WHITEBOARD
+  BEFORE_AFTER
+  ASMR_AESTHETIC
+  OTHER
+}
+
+enum SyncStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+  @@map("auth_accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model App {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#3b82f6")
+  url       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  trackedAccounts TrackedAccount[]
+}
+
+model TrackedAccount {
+  id             String    @id @default(uuid())
+  username       String    @unique
+  tiktokId       String?   @unique
+  displayName    String?
+  bio            String?
+  avatarUrl      String?
+  followers      Int       @default(0)
+  totalLikes     Int       @default(0)
+  totalVideos    Int       @default(0)
+  trackingSince  DateTime  @default(now())
+  lastSyncedAt   DateTime?
+  lastPostedAt   DateTime?
+  appId          String
+  app       App                @relation(fields: [appId], references: [id], onDelete: Cascade)
+  videos    Video[]
+  snapshots AccountSnapshot[]
+  @@index([appId])
+  @@index([username])
+}
+
+model Video {
+  id             String      @id @default(uuid())
+  tiktokVideoId  String      @unique
+  description    String      @default("")
+  hashtags       String[]
+  thumbnailUrl   String?
+  videoUrl       String?
+  duration       Int         @default(0)
+  postedAt       DateTime
+  views          Int         @default(0)
+  likes          Int         @default(0)
+  comments       Int         @default(0)
+  shares         Int         @default(0)
+  isCarousel     Boolean     @default(false)
+  musicName      String?
+  format         VideoFormat @default(OTHER)
+  accountId      String
+  account   TrackedAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  snapshots VideoSnapshot[]
+  @@index([accountId])
+  @@index([postedAt])
+  @@index([views])
+  @@index([format])
+  @@index([tiktokVideoId])
+}
+
+model AccountSnapshot {
+  id          String   @id @default(uuid())
+  accountId   String
+  followers   Int
+  totalLikes  Int
+  totalVideos Int
+  recordedAt  DateTime @default(now())
+  account TrackedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, recordedAt])
+  @@index([accountId, recordedAt])
+}
+
+model VideoSnapshot {
+  id         String   @id @default(uuid())
+  videoId    String
+  views      Int
+  likes      Int
+  comments   Int
+  shares     Int
+  recordedAt DateTime @default(now())
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  @@unique([videoId, recordedAt])
+  @@index([videoId, recordedAt])
+}
+
+model SyncLog {
+  id             String     @id @default(uuid())
+  status         SyncStatus @default(RUNNING)
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+  accountsSynced Int        @default(0)
+  videosSynced   Int        @default(0)
+  newVideos      Int        @default(0)
+  errors         Json?
+}
+
+model Settings {
+  id             String @id @default("default")
+  viralThreshold1 Int   @default(5000)
+  viralThreshold2 Int   @default(50000)
+  apifyApiKey    String @default("")
+  apifyActorId   String @default("")
+  geminiApiKey   String @default("")
+  syncCron       String @default("0 6 * * *")
+}
