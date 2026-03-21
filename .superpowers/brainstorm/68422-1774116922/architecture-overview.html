@@ -1,0 +1,86 @@
+<h2>Architecture Overview — oncourse Social Dashboard</h2>
+<p class="subtitle">Monolithic Next.js app on Vercel with Apify data pipeline</p>
+
+<div class="mockup">
+  <div class="mockup-header">System Architecture</div>
+  <div class="mockup-body" style="padding: 30px; font-family: monospace; font-size: 13px; line-height: 1.8;">
+    <div style="display: flex; gap: 40px; justify-content: center; flex-wrap: wrap;">
+
+      <!-- Data Collection -->
+      <div style="border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; min-width: 200px; background: rgba(245,158,11,0.05);">
+        <div style="font-weight: bold; color: #f59e0b; margin-bottom: 12px; font-size: 14px;">DATA COLLECTION</div>
+        <div style="margin-bottom: 8px;">🔄 Vercel Cron (daily)</div>
+        <div style="margin-bottom: 8px;">↓ triggers</div>
+        <div style="border: 1px solid #666; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
+          Apify TikTok Scraper<br>
+          <span style="color: #888; font-size: 11px;">• Profile Scraper<br>• Video Scraper</span>
+        </div>
+        <div style="margin-bottom: 8px;">↓ webhook callback</div>
+        <div style="border: 1px solid #666; border-radius: 6px; padding: 8px;">
+          Next.js API Route<br>
+          <span style="color: #888; font-size: 11px;">/api/sync/webhook</span>
+        </div>
+      </div>
+
+      <!-- Core App -->
+      <div style="border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; min-width: 280px; background: rgba(59,130,246,0.05);">
+        <div style="font-weight: bold; color: #3b82f6; margin-bottom: 12px; font-size: 14px;">NEXT.JS APP (Vercel)</div>
+        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <div style="border: 1px solid #666; border-radius: 6px; padding: 8px; flex: 1;">
+            <div style="font-weight: bold; font-size: 11px;">Frontend</div>
+            <span style="color: #888; font-size: 11px;">React + Tailwind<br>shadcn/ui<br>TanStack Table</span>
+          </div>
+          <div style="border: 1px solid #666; border-radius: 6px; padding: 8px; flex: 1;">
+            <div style="font-weight: bold; font-size: 11px;">API Routes</div>
+            <span style="color: #888; font-size: 11px;">Server Actions<br>REST endpoints<br>Auth (NextAuth)</span>
+          </div>
+        </div>
+        <div style="border: 1px solid #666; border-radius: 6px; padding: 8px;">
+          <div style="font-weight: bold; font-size: 11px;">Prisma ORM</div>
+          <span style="color: #888; font-size: 11px;">Type-safe DB access</span>
+        </div>
+      </div>
+
+      <!-- Storage -->
+      <div style="border: 2px solid #10b981; border-radius: 12px; padding: 20px; min-width: 180px; background: rgba(16,185,129,0.05);">
+        <div style="font-weight: bold; color: #10b981; margin-bottom: 12px; font-size: 14px;">STORAGE</div>
+        <div style="border: 1px solid #666; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
+          PostgreSQL<br>
+          <span style="color: #888; font-size: 11px;">(Supabase or Neon)</span>
+        </div>
+        <div style="border: 1px solid #666; border-radius: 6px; padding: 8px;">
+          Blob Storage<br>
+          <span style="color: #888; font-size: 11px;">Video thumbnails<br>(Vercel Blob / S3)</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Flow arrows -->
+    <div style="text-align: center; margin-top: 24px; color: #888; font-size: 12px;">
+      Apify scrapes TikTok → webhook delivers JSON → API route ingests into Postgres → Dashboard renders
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 24px;">
+  <h3>Key Decisions</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
+    <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px;">
+      <div class="label">Stack</div>
+      <p>Next.js 14 App Router, TypeScript, Tailwind, shadcn/ui, Prisma, NextAuth.js</p>
+    </div>
+    <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px;">
+      <div class="label">Data Source</div>
+      <p>Apify TikTok scrapers (~$30-60/mo), daily cron sync, webhook-based ingestion</p>
+    </div>
+    <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px;">
+      <div class="label">Database</div>
+      <p>PostgreSQL via Supabase or Neon (free tier), Prisma ORM</p>
+    </div>
+    <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px;">
+      <div class="label">Deploy</div>
+      <p>Vercel (Pro plan for 60s API routes), Vercel Cron for daily sync</p>
+    </div>
+  </div>
+</div>
