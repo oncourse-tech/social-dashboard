@@ -145,20 +145,33 @@ export function ViralClient({
         <VideoGrid videos={filtered} />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[900px]">
+          <table className="w-full min-w-[900px] table-fixed">
+            <colgroup>
+              <col style={{ width: "32px" }} />
+              <col style={{ width: "30%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "6%" }} />
+              <col style={{ width: "32px" }} />
+            </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
-                <th className="w-8 p-2" />
-                <th className="p-2 text-left" style={{ width: "35%" }}>Hook</th>
-                <th className="p-2 text-left whitespace-nowrap">Creator</th>
+                <th className="p-2" />
+                <th className="p-2 text-left">Hook</th>
+                <th className="p-2 text-left">Creator</th>
                 <th className="p-2 text-left">App</th>
                 <th className="p-2 text-left">Format</th>
-                <th className="p-2 text-right whitespace-nowrap">Views</th>
-                <th className="p-2 text-right whitespace-nowrap">Likes</th>
-                <th className="p-2 text-right whitespace-nowrap">Eng %</th>
-                <th className="p-2 text-left whitespace-nowrap">Posted</th>
+                <th className="p-2 text-right">Views</th>
+                <th className="p-2 text-right">Likes</th>
+                <th className="p-2 text-right">Eng %</th>
+                <th className="p-2 text-left">Posted</th>
                 <th className="p-2 text-center">Tier</th>
-                <th className="w-8 p-2" />
+                <th className="p-2" />
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -169,100 +182,104 @@ export function ViralClient({
                   </td>
                 </tr>
               ) : (
-                filtered.map((video) => {
+                filtered.flatMap((video) => {
                   const isExpanded = expandedRows.has(video.id);
                   const engRate = calcEngagementRate(video.views, video.likes, video.comments, video.shares);
                   const tier = getViralTier(video.views);
                   const hookText = video.hook || video.description?.slice(0, 80) || "";
                   const tiktokUrl = video.videoUrl || `https://www.tiktok.com/@${video.account.username}/video/${video.tiktokVideoId}`;
 
-                  return (
-                    <tbody key={video.id}>
-                      <tr
-                        className="border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
-                        onClick={() => toggleRow(video.id)}
-                      >
-                        <td className="p-2 text-center">
-                          {isExpanded
-                            ? <ChevronDown className="size-3.5 text-muted-foreground mx-auto" />
-                            : <ChevronRight className="size-3.5 text-muted-foreground mx-auto" />
-                          }
-                        </td>
-                        <td className="p-2">
-                          <p className={`line-clamp-2 text-[13px] leading-snug ${video.hook ? "text-foreground" : "text-muted-foreground"}`}>
-                            {hookText}
-                          </p>
-                        </td>
-                        <td className="p-2 whitespace-nowrap">
-                          <span className="text-xs font-medium">@{video.account.username}</span>
-                        </td>
-                        <td className="p-2">
-                          <AppBadge name={video.app.name} color={video.app.color} />
-                        </td>
-                        <td className="p-2">
-                          <FormatBadge format={video.format} />
-                        </td>
-                        <td className="p-2 text-right tabular-nums">
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <Eye className="size-3 text-muted-foreground" />
-                            {formatNumber(video.views)}
-                          </span>
-                        </td>
-                        <td className="p-2 text-right tabular-nums">
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <Heart className="size-3 text-muted-foreground" />
-                            {formatNumber(video.likes)}
-                          </span>
-                        </td>
-                        <td className="p-2 text-right">
-                          <span className="text-xs font-semibold tabular-nums">
-                            {formatEngagementRate(engRate)}
-                          </span>
-                        </td>
-                        <td className="p-2 whitespace-nowrap">
-                          <span className="text-xs text-muted-foreground">{relativeDate(video.postedAt)}</span>
-                        </td>
-                        <td className="p-2 text-center">
-                          <ViralTierBadge tier={tier} />
-                        </td>
-                        <td className="p-2 text-center">
-                          <a
-                            href={tiktokUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="size-3.5" />
-                          </a>
+                  const rows = [
+                    <tr
+                      key={video.id}
+                      className="border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
+                      onClick={() => toggleRow(video.id)}
+                    >
+                      <td className="p-2 text-center align-middle">
+                        {isExpanded
+                          ? <ChevronDown className="size-3.5 text-muted-foreground mx-auto" />
+                          : <ChevronRight className="size-3.5 text-muted-foreground mx-auto" />
+                        }
+                      </td>
+                      <td className="p-2 align-middle">
+                        <p className={`line-clamp-2 text-[13px] leading-snug ${video.hook ? "text-foreground" : "text-muted-foreground"}`}>
+                          {hookText}
+                        </p>
+                      </td>
+                      <td className="p-2 align-middle whitespace-nowrap">
+                        <span className="text-xs font-medium">@{video.account.username}</span>
+                      </td>
+                      <td className="p-2 align-middle">
+                        <AppBadge name={video.app.name} color={video.app.color} />
+                      </td>
+                      <td className="p-2 align-middle">
+                        <FormatBadge format={video.format} />
+                      </td>
+                      <td className="p-2 text-right align-middle tabular-nums">
+                        <span className="inline-flex items-center justify-end gap-1 text-xs">
+                          <Eye className="size-3 text-muted-foreground" />
+                          {formatNumber(video.views)}
+                        </span>
+                      </td>
+                      <td className="p-2 text-right align-middle tabular-nums">
+                        <span className="inline-flex items-center justify-end gap-1 text-xs">
+                          <Heart className="size-3 text-muted-foreground" />
+                          {formatNumber(video.likes)}
+                        </span>
+                      </td>
+                      <td className="p-2 text-right align-middle">
+                        <span className="text-xs font-semibold tabular-nums">
+                          {formatEngagementRate(engRate)}
+                        </span>
+                      </td>
+                      <td className="p-2 align-middle whitespace-nowrap">
+                        <span className="text-xs text-muted-foreground">{relativeDate(video.postedAt)}</span>
+                      </td>
+                      <td className="p-2 text-center align-middle">
+                        <ViralTierBadge tier={tier} />
+                      </td>
+                      <td className="p-2 text-center align-middle">
+                        <a
+                          href={tiktokUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      </td>
+                    </tr>,
+                  ];
+
+                  if (isExpanded) {
+                    rows.push(
+                      <tr key={`${video.id}-detail`} className="bg-muted/10 border-b border-border">
+                        <td />
+                        <td colSpan={10} className="p-3">
+                          <div className="space-y-1.5 text-xs">
+                            {video.script && (
+                              <div>
+                                <span className="font-semibold text-muted-foreground">Script: </span>
+                                <span>{video.script}</span>
+                              </div>
+                            )}
+                            {video.cta && (
+                              <div>
+                                <span className="font-semibold text-muted-foreground">CTA: </span>
+                                <span>{video.cta}</span>
+                              </div>
+                            )}
+                            {!video.script && !video.cta && (
+                              <span className="text-muted-foreground italic">No analysis data</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
-                      {isExpanded && (
-                        <tr className="bg-muted/10">
-                          <td />
-                          <td colSpan={10} className="p-3">
-                            <div className="space-y-1.5 text-xs">
-                              {video.script && (
-                                <div>
-                                  <span className="font-semibold text-muted-foreground">Script: </span>
-                                  <span>{video.script}</span>
-                                </div>
-                              )}
-                              {video.cta && (
-                                <div>
-                                  <span className="font-semibold text-muted-foreground">CTA: </span>
-                                  <span>{video.cta}</span>
-                                </div>
-                              )}
-                              {!video.script && !video.cta && (
-                                <span className="text-muted-foreground italic">No analysis data</span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  );
+                    );
+                  }
+
+                  return rows;
                 })
               )}
             </tbody>
