@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
+import { Providers } from "@/components/providers";
+import { AuthenticatedShell } from "@/components/authenticated-shell";
 
 export const metadata: Metadata = {
   title: "Social Dashboard -- oncourse",
@@ -22,12 +23,9 @@ export default function RootLayout({
       className="dark h-full antialiased"
     >
       <body className="min-h-full flex">
-        <div className="flex h-screen w-full">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto bg-background p-6">
-            {children}
-          </main>
-        </div>
+        <Providers>
+          <AuthenticatedShell>{children}</AuthenticatedShell>
+        </Providers>
       </body>
     </html>
   );

@@ -12,10 +12,12 @@ import {
   Upload,
   Settings,
   RefreshCw,
+  LogOut,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
+import { signOut } from "next-auth/react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutGrid,
@@ -80,9 +82,18 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-border px-4 py-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="size-2 rounded-full bg-emerald-500" />
-          Synced
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="size-2 rounded-full bg-emerald-500" />
+            Synced
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut className="size-3" />
+            Sign Out
+          </button>
         </div>
       </div>
     </aside>
