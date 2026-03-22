@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { db } from "@/lib/db";

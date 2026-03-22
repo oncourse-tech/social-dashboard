@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { db } from "@/lib/db";
 import { SummaryCards } from "@/components/summary-cards";
 import { AddAccountDialog } from "@/components/add-account-dialog";
