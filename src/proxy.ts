@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Check for NextAuth session token cookie
   const token =
     req.cookies.get("next-auth.session-token")?.value ||
