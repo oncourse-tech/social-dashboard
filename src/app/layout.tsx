@@ -22,7 +22,7 @@ export default function RootLayout({
       lang="en"
       className="dark h-full antialiased"
     >
-      <body className="min-h-full flex">
+      <body className="min-h-full">
         <Providers>
           <AuthenticatedShell>{children}</AuthenticatedShell>
         </Providers>
