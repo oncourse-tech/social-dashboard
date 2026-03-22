@@ -13,6 +13,7 @@ import {
   Settings,
   RefreshCw,
 } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 
@@ -33,7 +34,14 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 items-center border-b border-border px-4">
+      <div className="flex h-14 items-center gap-2 border-b border-border px-4">
+        <Image
+          src="/oncourse-logo.svg"
+          alt="oncourse"
+          width={28}
+          height={28}
+          className="rounded"
+        />
         <span className="text-base font-semibold tracking-tight">
           oncourse
         </span>

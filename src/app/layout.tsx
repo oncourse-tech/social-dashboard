@@ -5,6 +5,10 @@ import { Sidebar } from "@/components/sidebar";
 export const metadata: Metadata = {
   title: "Social Dashboard -- oncourse",
   description: "TikTok competitor intelligence for oncourse",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

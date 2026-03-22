@@ -1,3 +1,11 @@
+import {
+  LayoutGrid,
+  Users,
+  Film,
+  CalendarClock,
+  TrendingUp,
+  Flame,
+} from "lucide-react";
 import { db } from "@/lib/db";
 import { SummaryCards } from "@/components/summary-cards";
 import { AddAppDialog } from "@/components/add-app-dialog";
@@ -73,12 +81,12 @@ export default async function AppsPage() {
   });
 
   const summaryItems = [
-    { label: "Total Apps", value: apps.length },
-    { label: "Total Accounts", value: grandTotalAccounts },
-    { label: "Total Videos", value: grandTotalVideos },
-    { label: "Videos (7d)", value: grandVideos7d },
-    { label: ">5K Views", value: grandViral5k, highlight: "#ef4444" },
-    { label: ">50K Views", value: grandViral50k, highlight: "#ef4444" },
+    { label: "Total Apps", value: apps.length, icon: <LayoutGrid className="size-5" /> },
+    { label: "Total Accounts", value: grandTotalAccounts, icon: <Users className="size-5" /> },
+    { label: "Total Videos", value: grandTotalVideos, icon: <Film className="size-5" /> },
+    { label: "Videos (7d)", value: grandVideos7d, icon: <CalendarClock className="size-5" /> },
+    { label: ">5K Views", value: grandViral5k, highlight: "#ef4444", icon: <TrendingUp className="size-5" /> },
+    { label: ">50K Views", value: grandViral50k, highlight: "#ef4444", icon: <Flame className="size-5" /> },
   ];
 
   return (
