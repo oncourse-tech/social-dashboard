@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getApifyClient } from "@/lib/apify";
+import { getDatasetItems } from "@/lib/apify";
 import { classifyVideoFormat } from "@/lib/gemini";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { defaultDatasetId } = body.resource ?? body;
+    const defaultDatasetId = body.resource?.defaultDatasetId ?? body.defaultDatasetId;
 
     if (!defaultDatasetId) {
       return NextResponse.json(
@@ -15,9 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getApifyClient();
-    const dataset = client.dataset(defaultDatasetId);
-    const { items } = await dataset.listItems();
+    const items = await getDatasetItems(defaultDatasetId);
 
     // Find or create a sync log for this webhook
     const syncLog = await db.syncLog.create({
