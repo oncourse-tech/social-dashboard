@@ -3,6 +3,9 @@ import { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "./db";
 
+// Only these email domains can access the dashboard
+const ALLOWED_DOMAINS = ["getoncourse.ai", "oncourse.co"];
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db),
   session: { strategy: "jwt" },
@@ -16,15 +19,20 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email) return null;
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
-        });
+
+        const email = credentials.email.toLowerCase().trim();
+        const domain = email.split("@")[1];
+
+        // Only allow oncourse team emails
+        if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
+          throw new Error("Only oncourse team members can access this dashboard");
+        }
+
+        // Find or create user (only for allowed domains)
+        let user = await db.user.findUnique({ where: { email } });
         if (!user) {
-          return db.user.create({
-            data: {
-              email: credentials.email,
-              name: credentials.email.split("@")[0],
-            },
+          user = await db.user.create({
+            data: { email, name: email.split("@")[0] },
           });
         }
         return user;

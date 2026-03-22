@@ -1,22 +1,40 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const searchParams = useSearchParams();
+
+  // NextAuth sets ?error=CredentialsSignin when auth fails
+  const authError = searchParams.get("error");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email) return;
+    setError("");
     setLoading(true);
-    await signIn("credentials", { email, callbackUrl: "/apps" });
-    setLoading(false);
+
+    const result = await signIn("credentials", {
+      email,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Only oncourse team members can access this dashboard.");
+      setLoading(false);
+    } else {
+      window.location.href = searchParams.get("callbackUrl") || "/apps";
+    }
   }
 
   return (
@@ -36,16 +54,27 @@ export default function LoginPage() {
           <CardTitle className="text-center text-xl">
             Social Dashboard
           </CardTitle>
+          <p className="text-center text-sm text-muted-foreground">
+            Sign in with your oncourse email
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               type="email"
-              placeholder="you@example.com"
+              placeholder="you@getoncourse.ai"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError("");
+              }}
               required
             />
+            {(error || authError) && (
+              <p className="text-sm text-destructive">
+                {error || "Only oncourse team members can access this dashboard."}
+              </p>
+            )}
             <Button type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
@@ -53,5 +82,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
