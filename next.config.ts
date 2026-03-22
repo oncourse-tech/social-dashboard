@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["apify-client"],
   turbopack: {
     root: __dirname,
+    resolveAlias: {
+      tailwindcss: require.resolve("tailwindcss"),
+    },
   },
   images: {
     remotePatterns: [
