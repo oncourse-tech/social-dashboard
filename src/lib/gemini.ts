@@ -20,7 +20,7 @@ interface VideoMetadata {
   videoUrl: string | null;
 }
 
-const ANALYSIS_PROMPT = `You are an expert TikTok content analyst for educational apps. Watch this TikTok video carefully and extract four things.
+const ANALYSIS_PROMPT = `You are an expert TikTok content analyst specializing in short-form video strategy for ed-tech and study apps. Watch this TikTok video end-to-end before responding.
 
 ## Post metadata:
 - Caption: {description}
@@ -28,30 +28,30 @@ const ANALYSIS_PROMPT = `You are an expert TikTok content analyst for educationa
 - Duration: {duration} seconds
 - Sound: {musicName}
 
-## Extract:
+## Extract these four things:
 
-### FORMAT — classify into exactly ONE:
-- UGC_REACTION: Creator reacting to content on screen, duets, stitches, split-screen
-- UGC_VOICEOVER: Voice narrating over b-roll/screen recordings/slides
-- TALKING_HEAD: Creator speaking directly to camera, face visible, single shot
-- CAROUSEL_SLIDESHOW: Sequence of static images/text cards/slides
-- SCREEN_RECORDING: Phone/desktop screen capture showing an app
-- SKIT_COMEDY: Scripted comedic scenario, acting out situations
-- GREEN_SCREEN: Creator with background image behind them
-- TEXT_ON_SCREEN: Primarily text overlays with music, no face
-- INTERVIEW_PODCAST: Conversation between two or more people
-- WHITEBOARD: Hand-drawn diagrams, writing on board/paper
-- BEFORE_AFTER: Comparison showing transformation
-- ASMR_AESTHETIC: Satisfying visuals, study-with-me, desk setups
-- OTHER: None of the above
+### 1. FORMAT
+Classify the video into exactly ONE of these content format categories based on what you SEE and HEAR in the video:
 
-### HOOK — the exact opening words/text from the first 1-3 seconds that stops the scroll. If purely visual, describe it.
+- **UGC_REACTION**: A creator reacting to something on screen. This includes duets, stitches, split-screen reactions, or any format where the creator is visibly responding to existing content. The key signal is a reaction to another piece of content.
+- **UGC_VOICEOVER**: A creator narrating with their voice over visuals they did not film live. This includes voiceover on screen recordings, app demos, image slideshows, b-roll footage, or text animations. The key signal is that the voice is added in post, not filmed live.
+- **CAROUSEL_SLIDESHOW**: A sequence of static images, text cards, infographic slides, or tip lists. May have transitions between frames. The key signal is that the content is primarily static images or text frames, not live video footage.
+- **OTHER**: Does not clearly fit any of the three categories above.
 
-### SCRIPT — 2-4 sentence summary of the narrative arc: problem/tension → insight/solution → resolution.
+### 2. HOOK
+Extract the opening hook — the exact first thing the viewer sees or hears in the first 1-3 seconds that makes them stop scrolling. Write the exact words spoken or shown as text. If the hook is purely visual (no words), describe what the viewer sees in one sentence.
 
-### CTA — the call-to-action (explicit like "Follow for more" or implicit action the viewer is encouraged to take).
+### 3. SCRIPT
+Summarize the full video's script and narrative arc in 2-4 sentences. Capture: what tension, curiosity, or problem is introduced at the start, what insight or payoff is delivered, and how the video concludes. Focus on the storytelling structure, not just the topic.
 
-Respond with ONLY valid JSON, no markdown:
+### 4. CTA
+Extract the call-to-action. This could be:
+- Explicit: exact words like "Follow for more", "Link in bio", "Download the app", "Save this"
+- Implicit: what action the viewer is naturally encouraged to take based on the video's structure (e.g., try the technique, check out the app)
+If there is no CTA at all, write "None".
+
+## Response format
+Respond with ONLY this JSON. No markdown, no code blocks, no extra text:
 {"format":"<FORMAT>","hook":"<HOOK>","script":"<SCRIPT>","cta":"<CTA>"}`;
 
 export async function analyzeVideo(
