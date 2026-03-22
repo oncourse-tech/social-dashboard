@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum VideoFormat {
@@ -119,6 +120,9 @@ model Video {
   isCarousel     Boolean     @default(false)
   musicName      String?
   format         VideoFormat @default(OTHER)
+  hook           String?
+  script         String?
+  cta            String?
   accountId      String
   account   TrackedAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   snapshots VideoSnapshot[]

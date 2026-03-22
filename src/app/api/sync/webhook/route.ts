@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getDatasetItems } from "@/lib/apify";
 // apify-client is marked as serverExternalPackages in next.config.ts
-import { classifyVideoFormat } from "@/lib/gemini";
+import { analyzeVideo } from "@/lib/gemini";
 
 export async function POST(request: NextRequest) {
   try {
@@ -168,18 +168,24 @@ export async function POST(request: NextRequest) {
             videoRecordId = created.id;
             newVideos++;
 
-            // Classify format for new videos only
-            const format = await classifyVideoFormat({
+            // Analyze video with Gemini (format, hook, script, CTA)
+            const analysis = await analyzeVideo({
               description,
               hashtags,
               duration,
               musicName,
               thumbnailUrl,
+              videoUrl,
             });
 
             await db.video.update({
               where: { id: created.id },
-              data: { format },
+              data: {
+                format: analysis.format,
+                hook: analysis.hook,
+                script: analysis.script,
+                cta: analysis.cta,
+              },
             });
           }
 

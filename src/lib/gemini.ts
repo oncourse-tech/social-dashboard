@@ -1,7 +1,15 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText, UserContent } from "ai";
+import { google } from "@ai-sdk/google";
 import { VideoFormat } from "@prisma/client";
 
 const VALID_FORMATS = new Set(Object.values(VideoFormat));
+
+export type VideoAnalysis = {
+  format: VideoFormat;
+  hook: string;
+  script: string;
+  cta: string;
+};
 
 interface VideoMetadata {
   description: string;
@@ -9,100 +17,98 @@ interface VideoMetadata {
   duration: number;
   musicName: string | null;
   thumbnailUrl: string | null;
+  videoUrl: string | null;
 }
 
-const CLASSIFICATION_PROMPT = `You are a TikTok video format classifier. Analyze the video thumbnail image AND metadata to classify this video into exactly one format category.
+const ANALYSIS_PROMPT = `You are an expert TikTok content analyst for educational apps. Watch this TikTok video carefully and extract four things.
 
-Video metadata:
-- Description: {description}
+## Post metadata:
+- Caption: {description}
 - Hashtags: {hashtags}
-- Duration: {duration}s
-- Music: {musicName}
+- Duration: {duration} seconds
+- Sound: {musicName}
 
-Look at the thumbnail carefully and classify into ONE of these categories:
+## Extract:
 
-- UGC_REACTION: Creator reacting to content on screen, duets, stitches, split-screen reactions
-- UGC_VOICEOVER: Creator voiceover on screen recordings, slides, or b-roll footage
-- TALKING_HEAD: Creator speaking directly to camera, face visible, no split screen
-- CAROUSEL_SLIDESHOW: Image/text slides, educational cards, tips lists, multiple static frames
-- SCREEN_RECORDING: App demo, tutorial walkthrough, phone/desktop screen capture
-- SKIT_COMEDY: Scripted comedic scenarios, acting out relatable situations, comedy sketches
-- GREEN_SCREEN: Creator visible in corner/side with background image/article/screenshot behind them
-- TEXT_ON_SCREEN: Primarily text overlays with music, no face visible, text-based content
-- INTERVIEW_PODCAST: Clip from longer conversation, two or more people talking
-- WHITEBOARD: Drawing, writing, diagramming on screen or paper
-- BEFORE_AFTER: Transformation or comparison format, split before/after
-- ASMR_AESTHETIC: Satisfying visuals, study-with-me, desk setups, aesthetic content
-- OTHER: Does not clearly fit any category above
+### FORMAT — classify into exactly ONE:
+- UGC_REACTION: Creator reacting to content on screen, duets, stitches, split-screen
+- UGC_VOICEOVER: Voice narrating over b-roll/screen recordings/slides
+- TALKING_HEAD: Creator speaking directly to camera, face visible, single shot
+- CAROUSEL_SLIDESHOW: Sequence of static images/text cards/slides
+- SCREEN_RECORDING: Phone/desktop screen capture showing an app
+- SKIT_COMEDY: Scripted comedic scenario, acting out situations
+- GREEN_SCREEN: Creator with background image behind them
+- TEXT_ON_SCREEN: Primarily text overlays with music, no face
+- INTERVIEW_PODCAST: Conversation between two or more people
+- WHITEBOARD: Hand-drawn diagrams, writing on board/paper
+- BEFORE_AFTER: Comparison showing transformation
+- ASMR_AESTHETIC: Satisfying visuals, study-with-me, desk setups
+- OTHER: None of the above
 
-IMPORTANT: Use the thumbnail as the primary signal. The image shows what type of content this is.
+### HOOK — the exact opening words/text from the first 1-3 seconds that stops the scroll. If purely visual, describe it.
 
-Respond with ONLY a JSON object: {"format": "<CATEGORY>"}`;
+### SCRIPT — 2-4 sentence summary of the narrative arc: problem/tension → insight/solution → resolution.
 
-async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
+### CTA — the call-to-action (explicit like "Follow for more" or implicit action the viewer is encouraged to take).
+
+Respond with ONLY valid JSON, no markdown:
+{"format":"<FORMAT>","hook":"<HOOK>","script":"<SCRIPT>","cta":"<CTA>"}`;
+
+export async function analyzeVideo(
+  video: VideoMetadata
+): Promise<VideoAnalysis> {
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!response.ok) return null;
+    const promptText = ANALYSIS_PROMPT
+      .replace("{description}", video.description || "No caption")
+      .replace("{hashtags}", video.hashtags.join(", ") || "None")
+      .replace("{duration}", String(video.duration))
+      .replace("{musicName}", video.musicName ?? "Original sound");
 
-    const buffer = await response.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const userContent: UserContent = [];
 
-    return { data: base64, mimeType: contentType };
-  } catch {
-    return null;
+    if (video.videoUrl) {
+      userContent.push({
+        type: "file",
+        data: new URL(video.videoUrl),
+        mediaType: "video/mp4",
+      });
+    } else if (video.thumbnailUrl) {
+      userContent.push({
+        type: "file",
+        data: new URL(video.thumbnailUrl),
+        mediaType: "image/jpeg",
+      });
+    }
+
+    userContent.push({ type: "text", text: promptText });
+
+    const { text } = await generateText({
+      model: google("gemini-2.5-pro"),
+      messages: [{ role: "user" as const, content: userContent }],
+    });
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return { format: "OTHER" as VideoFormat, hook: "", script: "", cta: "" };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    return {
+      format: VALID_FORMATS.has(parsed.format) ? (parsed.format as VideoFormat) : ("OTHER" as VideoFormat),
+      hook: parsed.hook || "",
+      script: parsed.script || "",
+      cta: parsed.cta || "",
+    };
+  } catch (error) {
+    console.error("Gemini video analysis failed:", error);
+    return { format: "OTHER" as VideoFormat, hook: "", script: "", cta: "" };
   }
 }
 
 export async function classifyVideoFormat(
-  video: VideoMetadata
+  video: Omit<VideoMetadata, "videoUrl"> & { videoUrl?: string | null }
 ): Promise<VideoFormat> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn("GEMINI_API_KEY not set, defaulting to OTHER");
-    return VideoFormat.OTHER;
-  }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    const prompt = CLASSIFICATION_PROMPT
-      .replace("{description}", video.description || "No description")
-      .replace("{hashtags}", video.hashtags.join(", ") || "None")
-      .replace("{duration}", String(video.duration))
-      .replace("{musicName}", video.musicName ?? "Unknown");
-
-    // Build content parts — text + optional thumbnail image
-    const parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [];
-
-    // Try to fetch and include thumbnail for better classification
-    if (video.thumbnailUrl) {
-      const imageData = await fetchImageAsBase64(video.thumbnailUrl);
-      if (imageData) {
-        parts.push({ inlineData: imageData });
-      }
-    }
-
-    parts.push({ text: prompt });
-
-    const result = await model.generateContent(parts);
-    const text = result.response.text().trim();
-
-    // Extract JSON from response (handle markdown code blocks)
-    const jsonMatch = text.match(/\{[\s\S]*?\}/);
-    if (!jsonMatch) return VideoFormat.OTHER;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const format = parsed.format as string;
-
-    if (VALID_FORMATS.has(format as VideoFormat)) {
-      return format as VideoFormat;
-    }
-
-    return VideoFormat.OTHER;
-  } catch (error) {
-    console.error("Gemini classification failed:", error);
-    return VideoFormat.OTHER;
-  }
+  const result = await analyzeVideo({ ...video, videoUrl: video.videoUrl ?? null });
+  return result.format;
 }
