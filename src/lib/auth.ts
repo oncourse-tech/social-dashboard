@@ -3,8 +3,8 @@ import { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "./db";
 
-// Only these email domains can access the dashboard
-const ALLOWED_DOMAINS = ["getoncourse.ai", "oncourse.co"];
+// Shared team password — set via TEAM_PASSWORD env var
+const TEAM_PASSWORD = process.env.TEAM_PASSWORD || "oncourse2026";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db),
@@ -12,27 +12,27 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({
-      name: "Email",
+      name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        name: { label: "Name", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email) return null;
+        if (!credentials?.name || !credentials?.password) return null;
 
-        const email = credentials.email.toLowerCase().trim();
-        const domain = email.split("@")[1];
-
-        // Only allow oncourse team emails
-        if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
-          throw new Error("Only oncourse team members can access this dashboard");
+        // Verify shared team password
+        if (credentials.password !== TEAM_PASSWORD) {
+          throw new Error("Invalid password");
         }
 
-        // Find or create user (only for allowed domains)
+        const name = credentials.name.trim();
+        const email = `${name.toLowerCase().replace(/\s+/g, ".")}@oncourse.team`;
+
+        // Find or create user
         let user = await db.user.findUnique({ where: { email } });
         if (!user) {
           user = await db.user.create({
-            data: { email, name: email.split("@")[0] },
+            data: { email, name },
           });
         }
         return user;
