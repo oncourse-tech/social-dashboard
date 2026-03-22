@@ -7,14 +7,10 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
 
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
-
   return (
-    <div className="flex h-screen w-full">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-background p-6">
+    <div className="flex h-screen w-full" suppressHydrationWarning>
+      {!isLoginPage && <Sidebar />}
+      <main className={isLoginPage ? "flex-1" : "flex-1 overflow-y-auto bg-background p-6"}>
         {children}
       </main>
     </div>
