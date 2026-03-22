@@ -15,17 +15,13 @@ export async function POST(request: NextRequest) {
 
     const cleanUsername = username.replace(/^@/, "");
     const client = getApifyClient();
-    const actorId = process.env.APIFY_ACTOR_ID;
-
-    if (!actorId) {
-      return NextResponse.json(
-        { error: "APIFY_ACTOR_ID is not configured" },
-        { status: 500 }
-      );
-    }
+    // Use the profile scraper actor (or custom actor ID from env)
+    const actorId =
+      process.env.APIFY_ACTOR_ID || "clockworks/tiktok-profile-scraper";
 
     const run = await client.actor(actorId).call({
       profiles: [cleanUsername],
+      resultsPerPage: 100,
     });
 
     const items = await getDatasetItems(run.defaultDatasetId);
@@ -37,17 +33,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // The profile scraper returns a flat array of videos.
+    // Extract profile info from the first item's authorMeta.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const item = items[0] as Record<string, any>;
+    const firstItem = items[0] as Record<string, any>;
+    const authorMeta = firstItem.authorMeta ?? {};
 
     const profile = {
-      username: (item.uniqueId ?? item.authorMeta?.name ?? cleanUsername) as string,
-      displayName: (item.authorMeta?.nickName ?? item.nickname ?? null) as string | null,
-      followers: (item.authorMeta?.fans ?? item.fans ?? 0) as number,
-      totalLikes: (item.authorMeta?.heart ?? item.heart ?? 0) as number,
-      bio: (item.authorMeta?.signature ?? item.signature ?? null) as string | null,
-      avatarUrl: (item.authorMeta?.avatar ?? item.avatarMedium ?? null) as string | null,
-      totalVideos: (item.authorMeta?.video ?? item.video ?? 0) as number,
+      username: (authorMeta.name ?? cleanUsername) as string,
+      displayName: (authorMeta.nickName ?? null) as string | null,
+      followers: (authorMeta.fans ?? 0) as number,
+      totalLikes: (authorMeta.heart ?? 0) as number,
+      bio: (authorMeta.signature ?? null) as string | null,
+      avatarUrl: (authorMeta.avatar ?? null) as string | null,
+      totalVideos: (authorMeta.video ?? items.length) as number,
     };
 
     return NextResponse.json(profile);

@@ -7,7 +7,8 @@ import { classifyVideoFormat } from "@/lib/gemini";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const defaultDatasetId = body.resource?.defaultDatasetId ?? body.defaultDatasetId;
+    const defaultDatasetId =
+      body.resource?.defaultDatasetId ?? body.defaultDatasetId;
 
     if (!defaultDatasetId) {
       return NextResponse.json(
@@ -18,44 +19,64 @@ export async function POST(request: NextRequest) {
 
     const items = await getDatasetItems(defaultDatasetId);
 
-    // Find or create a sync log for this webhook
-    const syncLog = await db.syncLog.create({
-      data: { status: "RUNNING" },
+    // Find the most recent RUNNING sync log (the trigger already created one)
+    const syncLog = await db.syncLog.findFirst({
+      where: { status: "RUNNING" },
+      orderBy: { startedAt: "desc" },
     });
+
+    // Fallback: create one if none found (e.g. manual webhook test)
+    const syncLogId = syncLog
+      ? syncLog.id
+      : (await db.syncLog.create({ data: { status: "RUNNING" } })).id;
 
     let accountsSynced = 0;
     let videosSynced = 0;
     let newVideos = 0;
     const errors: Array<{ username: string; error: string }> = [];
 
+    // The profile scraper returns a FLAT array of videos.
+    // Each item is a video with authorMeta embedded.
+    // Group items by username (authorMeta.name).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const rawItem of items) {
-      const item = rawItem as Record<string, any>;
-      try {
-        const username = (item.uniqueId ?? item.authorMeta?.name ?? "") as string;
-        if (!username) continue;
+    const itemsByUsername = new Map<string, Array<Record<string, any>>>();
 
+    for (const rawItem of items) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const item = rawItem as Record<string, any>;
+      const username = (item.authorMeta?.name ?? "") as string;
+      if (!username) continue;
+
+      if (!itemsByUsername.has(username)) {
+        itemsByUsername.set(username, []);
+      }
+      itemsByUsername.get(username)!.push(item);
+    }
+
+    for (const [username, videoItems] of itemsByUsername) {
+      try {
         const account = await db.trackedAccount.findUnique({
           where: { username },
         });
 
         if (!account) continue;
 
-        // Update account metrics
-        const followers = (item.authorMeta?.fans ?? item.fans ?? account.followers) as number;
-        const totalLikes = (item.authorMeta?.heart ?? item.heart ?? account.totalLikes) as number;
-        const totalVideos = (item.authorMeta?.video ?? item.video ?? account.totalVideos) as number;
-        const displayName = (item.authorMeta?.nickName ?? item.nickname ?? account.displayName) as string | null;
-        const bio = (item.authorMeta?.signature ?? item.signature ?? account.bio) as string | null;
-        const avatarUrl = (item.authorMeta?.avatar ?? item.avatarMedium ?? account.avatarUrl) as string | null;
-        const tiktokId = (item.authorMeta?.id ?? item.id ?? account.tiktokId) as string | null;
+        // Update account metrics from the first item's authorMeta
+        const authorMeta = videoItems[0].authorMeta ?? {};
+        const followers = (authorMeta.fans ?? account.followers) as number;
+        const totalLikes = (authorMeta.heart ?? account.totalLikes) as number;
+        const displayName = (authorMeta.nickName ??
+          account.displayName) as string | null;
+        const bio = (authorMeta.signature ?? account.bio) as string | null;
+        const avatarUrl = (authorMeta.avatar ??
+          account.avatarUrl) as string | null;
+        const tiktokId = (authorMeta.id ?? account.tiktokId) as string | null;
 
         await db.trackedAccount.update({
           where: { id: account.id },
           data: {
             followers,
             totalLikes,
-            totalVideos,
             displayName,
             bio,
             avatarUrl,
@@ -70,39 +91,41 @@ export async function POST(request: NextRequest) {
             accountId: account.id,
             followers,
             totalLikes,
-            totalVideos,
+            totalVideos: account.totalVideos,
           },
         });
 
         accountsSynced++;
 
-        // Process videos
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const videos = (item.latestVideos ?? item.videos ?? []) as Array<Record<string, any>>;
-
+        // Process each video item
         let latestPostedAt: Date | null = null;
+        let videoCount = 0;
 
-        for (const video of videos) {
-          const tiktokVideoId = String(video.id ?? video.videoId ?? "");
+        for (const video of videoItems) {
+          const tiktokVideoId = String(video.id ?? "");
           if (!tiktokVideoId) continue;
 
-          const views = (video.playCount ?? video.views ?? 0) as number;
-          const likes = (video.diggCount ?? video.likes ?? 0) as number;
-          const comments = (video.commentCount ?? video.comments ?? 0) as number;
-          const shares = (video.shareCount ?? video.shares ?? 0) as number;
-          const description = (video.text ?? video.description ?? "") as string;
-          const hashtags = ((video.hashtags as Array<Record<string, string>> | undefined)?.map(
-            (h) => h.name ?? h.title ?? ""
-          ) ?? []) as string[];
-          const duration = (video.videoMeta?.duration ?? video.duration ?? 0) as number;
-          const musicName = (video.musicMeta?.musicName ?? video.music?.title ?? null) as string | null;
-          const thumbnailUrl = (video.videoMeta?.coverUrl ?? video.covers?.default ?? null) as string | null;
-          const videoUrl = (video.videoUrl ?? video.videoMeta?.downloadAddr ?? null) as string | null;
-          const postedAtRaw = video.createTimeISO ?? video.createTime;
-          const postedAt = postedAtRaw
-            ? new Date(typeof postedAtRaw === "number" ? postedAtRaw * 1000 : String(postedAtRaw))
-            : new Date();
-          const isCarousel = Boolean(video.imagePost ?? video.isCarousel ?? false);
+          const views = (video.playCount ?? 0) as number;
+          const likes = (video.diggCount ?? 0) as number;
+          const comments = (video.commentCount ?? 0) as number;
+          const shares = (video.shareCount ?? 0) as number;
+          const description = (video.text ?? "") as string;
+          const hashtags = (
+            (video.hashtags as Array<Record<string, string>> | undefined)?.map(
+              (h) => h.name ?? ""
+            ) ?? []
+          ) as string[];
+          const duration = (video.videoMeta?.duration ?? 0) as number;
+          const musicName = (video.musicMeta?.musicName ?? null) as
+            | string
+            | null;
+          const thumbnailUrl = (video.videoMeta?.coverUrl ?? null) as
+            | string
+            | null;
+          const videoUrl = (video.webVideoUrl ?? null) as string | null;
+          const postedAtRaw = video.createTimeISO;
+          const postedAt = postedAtRaw ? new Date(String(postedAtRaw)) : new Date();
+          const isCarousel = Boolean(video.imagePost ?? false);
 
           if (!latestPostedAt || postedAt > latestPostedAt) {
             latestPostedAt = postedAt;
@@ -116,7 +139,7 @@ export async function POST(request: NextRequest) {
           let videoRecordId: string;
 
           if (existing) {
-            // Update existing video
+            // Update existing video metrics
             await db.video.update({
               where: { id: existing.id },
               data: { views, likes, comments, shares },
@@ -145,7 +168,7 @@ export async function POST(request: NextRequest) {
             videoRecordId = created.id;
             newVideos++;
 
-            // Classify format for new videos
+            // Classify format for new videos only
             const format = await classifyVideoFormat({
               description,
               hashtags,
@@ -160,7 +183,7 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // Create video snapshot
+          // Create video snapshot for EVERY video (tracks daily engagement)
           await db.videoSnapshot.create({
             data: {
               videoId: videoRecordId,
@@ -172,17 +195,18 @@ export async function POST(request: NextRequest) {
           });
 
           videosSynced++;
+          videoCount++;
         }
 
-        // Update lastPostedAt
-        if (latestPostedAt) {
-          await db.trackedAccount.update({
-            where: { id: account.id },
-            data: { lastPostedAt: latestPostedAt },
-          });
-        }
+        // Update lastPostedAt and totalVideos
+        await db.trackedAccount.update({
+          where: { id: account.id },
+          data: {
+            ...(latestPostedAt ? { lastPostedAt: latestPostedAt } : {}),
+            totalVideos: account.totalVideos + newVideos,
+          },
+        });
       } catch (err) {
-        const username = (item.uniqueId ?? "unknown") as string;
         console.error(`Error processing ${username}:`, err);
         errors.push({
           username,
@@ -193,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     // Update sync log
     await db.syncLog.update({
-      where: { id: syncLog.id },
+      where: { id: syncLogId },
       data: {
         status: "COMPLETED",
         completedAt: new Date(),
@@ -205,7 +229,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      syncLogId: syncLog.id,
+      syncLogId,
       accountsSynced,
       videosSynced,
       newVideos,

@@ -8,13 +8,17 @@ export function getApifyClient() {
 
 export async function triggerTikTokScraper(usernames: string[]) {
   const client = getApifyClient();
-  const actorId = process.env.APIFY_ACTOR_ID;
-  if (!actorId) throw new Error("APIFY_ACTOR_ID is not set");
+  // Use the profile scraper actor (or custom actor ID from env)
+  const actorId =
+    process.env.APIFY_ACTOR_ID || "clockworks/tiktok-profile-scraper";
 
   const webhookUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/sync/webhook`;
 
   const run = await client.actor(actorId).call(
-    { profiles: usernames },
+    {
+      profiles: usernames,
+      resultsPerPage: 100,
+    },
     {
       webhooks: [
         {
