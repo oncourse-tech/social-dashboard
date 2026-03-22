@@ -14,25 +14,22 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        name: { label: "Name", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.name || !credentials?.password) return null;
+        if (!credentials?.password) return null;
 
         // Verify shared team password
         if (credentials.password !== TEAM_PASSWORD) {
           throw new Error("Invalid password");
         }
 
-        const name = credentials.name.trim();
-        const email = `${name.toLowerCase().replace(/\s+/g, ".")}@oncourse.team`;
-
-        // Find or create user
+        // Use a single shared team user
+        const email = "team@oncourse.internal";
         let user = await db.user.findUnique({ where: { email } });
         if (!user) {
           user = await db.user.create({
-            data: { email, name },
+            data: { email, name: "oncourse team" },
           });
         }
         return user;
