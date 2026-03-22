@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDatasetItems } from "@/lib/apify";
-
-const APIFY_BASE = "https://api.apify.com/v2";
+import { getApifyClient, getDatasetItems } from "@/lib/apify";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,54 +14,21 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanUsername = username.replace(/^@/, "");
-    const token = process.env.APIFY_API_KEY;
+    const client = getApifyClient();
     const actorId = process.env.APIFY_ACTOR_ID;
 
-    if (!token || !actorId) {
+    if (!actorId) {
       return NextResponse.json(
-        { error: "Apify is not configured" },
+        { error: "APIFY_ACTOR_ID is not configured" },
         { status: 500 }
       );
     }
 
-    // Trigger actor run for single profile
-    const runRes = await fetch(
-      `${APIFY_BASE}/acts/${actorId}/runs?token=${token}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profiles: [cleanUsername] }),
-      }
-    );
+    const run = await client.actor(actorId).call({
+      profiles: [cleanUsername],
+    });
 
-    if (!runRes.ok) {
-      return NextResponse.json(
-        { error: "Failed to start Apify run" },
-        { status: 500 }
-      );
-    }
-
-    const run = await runRes.json();
-    const datasetId = run.data.defaultDatasetId;
-
-    // Wait for run to complete (poll every 2s, max 60s)
-    const startTime = Date.now();
-    while (Date.now() - startTime < 60000) {
-      const statusRes = await fetch(
-        `${APIFY_BASE}/actor-runs/${run.data.id}?token=${token}`
-      );
-      const statusData = await statusRes.json();
-      if (statusData.data.status === "SUCCEEDED") break;
-      if (statusData.data.status === "FAILED") {
-        return NextResponse.json(
-          { error: "Profile lookup failed" },
-          { status: 500 }
-        );
-      }
-      await new Promise((r) => setTimeout(r, 2000));
-    }
-
-    const items = await getDatasetItems(datasetId);
+    const items = await getDatasetItems(run.defaultDatasetId);
 
     if (!items.length) {
       return NextResponse.json(

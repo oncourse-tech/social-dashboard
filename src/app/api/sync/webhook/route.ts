@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getDatasetItems } from "@/lib/apify";
+// apify-client is marked as serverExternalPackages in next.config.ts
 import { classifyVideoFormat } from "@/lib/gemini";
 
 export async function POST(request: NextRequest) {
