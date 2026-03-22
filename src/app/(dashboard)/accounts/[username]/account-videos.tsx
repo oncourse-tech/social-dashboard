@@ -9,6 +9,12 @@ import { VideoGrid, type VideoCardData } from "@/components/video-grid";
 import { DataTable } from "@/components/data-table";
 import { FormatBadge } from "@/components/format-badge";
 import { ViralTierBadge } from "@/components/viral-tier-badge";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,23 +23,67 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatNumber, formatDate, getViralTier } from "@/lib/utils";
+import {
+  formatNumber,
+  getViralTier,
+  relativeDate,
+  calcEngagementRate,
+  formatEngagementRate,
+} from "@/lib/utils";
 import { FORMAT_LABELS } from "@/lib/constants";
 
-const listColumns: ColumnDef<VideoCardData, unknown>[] = [
+type AccountVideo = VideoCardData & {
+  hook: string | null;
+  script: string | null;
+  cta: string | null;
+};
+
+const listColumns: ColumnDef<AccountVideo, unknown>[] = [
   {
-    accessorKey: "description",
-    header: "Description",
-    cell: ({ row }) => (
-      <span className="line-clamp-1 max-w-[200px]">
-        {row.original.description || "No description"}
-      </span>
-    ),
+    accessorKey: "hook",
+    header: "Hook",
+    enableSorting: false,
+    cell: ({ row }) => {
+      const hookText = row.original.hook || "";
+      const fallbackText = !hookText
+        ? (row.original.description || "").slice(0, 60)
+        : "";
+      const displayText = hookText || fallbackText;
+
+      if (!displayText) {
+        return (
+          <span className="text-xs text-muted-foreground italic">No hook</span>
+        );
+      }
+
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger className="text-left">
+              <p
+                className={`line-clamp-2 max-w-[250px] text-sm leading-snug ${
+                  !hookText ? "text-muted-foreground" : "text-foreground"
+                }`}
+              >
+                {displayText}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="start" className="max-w-sm">
+              {hookText || fallbackText}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    },
   },
   {
     accessorKey: "postedAt",
     header: "Posted",
-    cell: ({ row }) => formatDate(row.original.postedAt),
+    cell: ({ row }) => (
+      <span className="text-xs text-muted-foreground">
+        {relativeDate(row.original.postedAt)}
+      </span>
+    ),
   },
   {
     accessorKey: "views",
@@ -44,6 +94,25 @@ const listColumns: ColumnDef<VideoCardData, unknown>[] = [
     accessorKey: "likes",
     header: "Likes",
     cell: ({ row }) => formatNumber(row.original.likes),
+  },
+  {
+    id: "engRate",
+    header: "Eng. Rate",
+    accessorFn: (row) =>
+      calcEngagementRate(row.views, row.likes, row.comments, row.shares),
+    cell: ({ row }) => {
+      const rate = calcEngagementRate(
+        row.original.views,
+        row.original.likes,
+        row.original.comments,
+        row.original.shares
+      );
+      return (
+        <span className="tabular-nums text-xs font-medium">
+          {formatEngagementRate(rate)}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "comments",
@@ -95,24 +164,40 @@ export function AccountVideos({
   videos,
   username,
 }: {
-  videos: VideoCardData[];
+  videos: AccountVideo[];
   username: string;
 }) {
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list">("list");
   const [search, setSearch] = useState("");
   const [formatFilter, setFormatFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<string>("all");
 
   const filtered = useMemo(() => {
     return videos.filter((v) => {
       if (formatFilter !== "all" && v.format !== formatFilter) return false;
+
+      if (dateRange !== "all") {
+        const now = new Date();
+        let cutoff: Date;
+        if (dateRange === "7d") {
+          cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (dateRange === "30d") {
+          cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else {
+          cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        }
+        if (new Date(v.postedAt) < cutoff) return false;
+      }
+
       if (!search) return true;
       const q = search.toLowerCase();
       return (
         v.description.toLowerCase().includes(q) ||
-        v.hashtags.some((h) => h.toLowerCase().includes(q))
+        v.hashtags.some((h) => h.toLowerCase().includes(q)) ||
+        (v.hook && v.hook.toLowerCase().includes(q))
       );
     });
-  }, [videos, search, formatFilter]);
+  }, [videos, search, formatFilter, dateRange]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -130,13 +215,16 @@ export function AccountVideos({
         <div className="relative flex-1 md:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search description or hashtag..."
+            placeholder="Search description, hooks, or hashtags..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
           />
         </div>
-        <Select value={formatFilter} onValueChange={(val) => setFormatFilter(val ?? "all")}>
+        <Select
+          value={formatFilter}
+          onValueChange={(val) => setFormatFilter(val ?? "all")}
+        >
           <SelectTrigger>
             <SelectValue placeholder="All Formats" />
           </SelectTrigger>
@@ -147,6 +235,20 @@ export function AccountVideos({
                 {label}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={dateRange}
+          onValueChange={(val) => setDateRange(val ?? "all")}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="All Time" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+            <SelectItem value="90d">Last 90 days</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -8,7 +8,9 @@ import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { formatNumber } from "@/lib/utils";
 import type { AppWithStats } from "@/types";
 
-const columns: ColumnDef<AppWithStats, unknown>[] = [
+type AppWithTopFormat = AppWithStats & { topFormat: string };
+
+const columns: ColumnDef<AppWithTopFormat, unknown>[] = [
   {
     accessorKey: "name",
     header: "App",
@@ -40,6 +42,16 @@ const columns: ColumnDef<AppWithStats, unknown>[] = [
     accessorKey: "videos7d",
     header: "7d",
     cell: ({ row }) => formatNumber(row.original.videos7d),
+  },
+  {
+    id: "topFormat",
+    header: "Top Format",
+    enableSorting: false,
+    cell: ({ row }) => (
+      <span className="text-xs text-muted-foreground">
+        {row.original.topFormat}
+      </span>
+    ),
   },
   {
     accessorKey: "viral5k",
@@ -89,7 +101,7 @@ const columns: ColumnDef<AppWithStats, unknown>[] = [
   },
 ];
 
-export function AppsTable({ data }: { data: AppWithStats[] }) {
+export function AppsTable({ data }: { data: AppWithTopFormat[] }) {
   const router = useRouter();
 
   return (

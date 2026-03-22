@@ -15,9 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber, formatDate } from "@/lib/utils";
+import { FORMAT_LABELS } from "@/lib/constants";
+import { type VideoFormat } from "@prisma/client";
 import type { AccountWithStats } from "@/types";
 
-const columns: ColumnDef<AccountWithStats, unknown>[] = [
+type AccountRow = AccountWithStats & { dominantFormat: string | null };
+
+const columns: ColumnDef<AccountRow, unknown>[] = [
   {
     accessorKey: "username",
     header: "Account",
@@ -32,6 +36,19 @@ const columns: ColumnDef<AccountWithStats, unknown>[] = [
     cell: ({ row }) => (
       <AppBadge name={row.original.app.name} color={row.original.app.color} />
     ),
+  },
+  {
+    id: "dominantFormat",
+    header: "Top Format",
+    enableSorting: false,
+    cell: ({ row }) => {
+      const fmt = row.original.dominantFormat as VideoFormat | null;
+      return (
+        <span className="text-xs text-muted-foreground">
+          {fmt ? FORMAT_LABELS[fmt] : "N/A"}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "lastPostedAt",
@@ -116,19 +133,24 @@ const columns: ColumnDef<AccountWithStats, unknown>[] = [
   },
 ];
 
+const FORMAT_OPTIONS = Object.entries(FORMAT_LABELS) as [VideoFormat, string][];
+
 export function AccountsTable({
   data,
   apps,
   currentAppFilter,
 }: {
-  data: AccountWithStats[];
+  data: AccountRow[];
   apps: { id: string; name: string; color: string }[];
   currentAppFilter?: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [formatFilter, setFormatFilter] = useState("all");
 
   const filtered = data.filter((account) => {
+    if (formatFilter !== "all" && account.dominantFormat !== formatFilter)
+      return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -167,6 +189,22 @@ export function AccountsTable({
             {apps.map((app) => (
               <SelectItem key={app.id} value={app.id}>
                 {app.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={formatFilter}
+          onValueChange={(val) => setFormatFilter(val ?? "all")}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="All Formats" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Formats</SelectItem>
+            {FORMAT_OPTIONS.map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>

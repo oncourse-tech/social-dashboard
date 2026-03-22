@@ -2,8 +2,11 @@ export const dynamic = 'force-dynamic';
 
 import { db } from "@/lib/db";
 import { SummaryCards } from "@/components/summary-cards";
-import { Flame } from "lucide-react";
+import { Flame, TrendingUp, BarChart3, CalendarClock } from "lucide-react";
 import { ViralClient } from "./viral-client";
+import { calcEngagementRate } from "@/lib/utils";
+import { FORMAT_LABELS } from "@/lib/constants";
+import { type VideoFormat } from "@prisma/client";
 
 export default async function ViralPage() {
   const settings = await db.settings.findFirst({ where: { id: "default" } });
@@ -14,10 +17,7 @@ export default async function ViralPage() {
     where: { views: { gte: threshold1 } },
     include: {
       account: {
-        select: {
-          username: true,
-          app: { select: { id: true, name: true, color: true } },
-        },
+        include: { app: { select: { id: true, name: true, color: true } } },
       },
     },
     orderBy: { views: "desc" },
@@ -29,13 +29,58 @@ export default async function ViralPage() {
   });
 
   const totalViral = videos.length;
-  const over5k = videos.filter((v) => v.views >= threshold1).length;
-  const over50k = videos.filter((v) => v.views >= threshold2).length;
+
+  // Avg engagement rate
+  const engRates = videos.map((v) =>
+    calcEngagementRate(v.views, v.likes, v.comments, v.shares)
+  );
+  const avgEngRate =
+    engRates.length > 0
+      ? engRates.reduce((a, b) => a + b, 0) / engRates.length
+      : 0;
+
+  // Top format
+  const formatCounts: Record<string, number> = {};
+  for (const v of videos) {
+    formatCounts[v.format] = (formatCounts[v.format] || 0) + 1;
+  }
+  const topFormat = Object.entries(formatCounts).sort(
+    (a, b) => b[1] - a[1]
+  )[0];
+  const topFormatLabel = topFormat
+    ? FORMAT_LABELS[topFormat[0] as VideoFormat]
+    : "N/A";
+
+  // Videos this week
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const videosThisWeek = videos.filter(
+    (v) => new Date(v.postedAt) >= sevenDaysAgo
+  ).length;
 
   const summaryItems = [
-    { label: "Total Viral Videos", value: totalViral, icon: <Flame className="size-4" /> },
-    { label: `>${formatThreshold(threshold1)} Views`, value: over5k, highlight: "#eab308" },
-    { label: `>${formatThreshold(threshold2)} Views`, value: over50k, highlight: "#ef4444" },
+    {
+      label: "Total Viral Videos",
+      value: totalViral,
+      icon: <Flame className="size-4" />,
+    },
+    {
+      label: "Avg Engagement Rate",
+      value: Math.round(avgEngRate * 10) / 10,
+      icon: <TrendingUp className="size-4" />,
+      suffix: "%",
+    },
+    {
+      label: `Top Format`,
+      value: 0,
+      icon: <BarChart3 className="size-4" />,
+      textValue: topFormatLabel,
+    },
+    {
+      label: "Videos This Week",
+      value: videosThisWeek,
+      icon: <CalendarClock className="size-4" />,
+    },
   ];
 
   const mapped = videos.map((v) => ({
@@ -44,12 +89,15 @@ export default async function ViralPage() {
     description: v.description,
     hashtags: v.hashtags,
     thumbnailUrl: v.thumbnailUrl,
-    postedAt: v.postedAt,
+    postedAt: v.postedAt.toISOString(),
     views: v.views,
     likes: v.likes,
     comments: v.comments,
     shares: v.shares,
     format: v.format,
+    hook: v.hook,
+    script: v.script,
+    cta: v.cta,
     account: { username: v.account.username },
     app: v.account.app,
   }));
@@ -61,9 +109,4 @@ export default async function ViralPage() {
       <ViralClient videos={mapped} apps={apps} />
     </div>
   );
-}
-
-function formatThreshold(n: number): string {
-  if (n >= 1000) return `${n / 1000}K`;
-  return String(n);
 }

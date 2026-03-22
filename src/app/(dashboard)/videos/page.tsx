@@ -9,10 +9,7 @@ export default async function VideosPage() {
   const videos = await db.video.findMany({
     include: {
       account: {
-        select: {
-          username: true,
-          app: { select: { id: true, name: true, color: true } },
-        },
+        include: { app: { select: { id: true, name: true, color: true } } },
       },
     },
     orderBy: { views: "desc" },
@@ -29,12 +26,15 @@ export default async function VideosPage() {
     description: v.description,
     hashtags: v.hashtags,
     thumbnailUrl: v.thumbnailUrl,
-    postedAt: v.postedAt,
+    postedAt: v.postedAt.toISOString(),
     views: v.views,
     likes: v.likes,
     comments: v.comments,
     shares: v.shares,
     format: v.format,
+    hook: v.hook,
+    script: v.script,
+    cta: v.cta,
     account: { username: v.account.username },
     app: v.account.app,
   }));

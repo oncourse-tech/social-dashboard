@@ -65,6 +65,9 @@ export default async function AccountDetailPage({
     comments: v.comments,
     shares: v.shares,
     format: v.format as VideoFormat,
+    hook: v.hook,
+    script: v.script,
+    cta: v.cta,
     account: { username: account.username },
   }));
 

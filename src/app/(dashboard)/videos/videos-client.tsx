@@ -18,32 +18,76 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatNumber, formatDate, getViralTier } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import {
+  formatNumber,
+  getViralTier,
+  relativeDate,
+  calcEngagementRate,
+  formatEngagementRate,
+} from "@/lib/utils";
 import { FORMAT_LABELS } from "@/lib/constants";
 import { type VideoFormat } from "@prisma/client";
 
 type AllVideo = VideoCardData & {
+  hook: string | null;
+  script: string | null;
+  cta: string | null;
   account: { username: string };
   app: { id: string; name: string; color: string };
 };
 
 const columns: ColumnDef<AllVideo, unknown>[] = [
   {
-    accessorKey: "description",
-    header: "Description",
+    accessorKey: "hook",
+    header: "Hook",
     enableSorting: false,
-    cell: ({ row }) => (
-      <p className="line-clamp-1 max-w-[200px] text-xs">
-        {row.original.description || "No description"}
-      </p>
-    ),
+    cell: ({ row }) => {
+      const hookText = row.original.hook || "";
+      const fallbackText = !hookText
+        ? (row.original.description || "").slice(0, 60)
+        : "";
+      const displayText = hookText || fallbackText;
+
+      if (!displayText) {
+        return (
+          <span className="text-xs text-muted-foreground italic">No hook</span>
+        );
+      }
+
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger className="text-left">
+              <p
+                className={`line-clamp-2 max-w-[300px] text-sm leading-snug ${
+                  !hookText ? "text-muted-foreground" : "text-foreground"
+                }`}
+              >
+                {displayText}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="start" className="max-w-sm">
+              {hookText || fallbackText}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    },
   },
   {
     accessorKey: "account",
     header: "Creator",
     enableSorting: false,
     cell: ({ row }) => (
-      <span className="font-medium text-xs">@{row.original.account.username}</span>
+      <span className="font-medium text-xs">
+        @{row.original.account.username}
+      </span>
     ),
   },
   {
@@ -53,6 +97,12 @@ const columns: ColumnDef<AllVideo, unknown>[] = [
     cell: ({ row }) => (
       <AppBadge name={row.original.app.name} color={row.original.app.color} />
     ),
+  },
+  {
+    accessorKey: "format",
+    header: "Format",
+    enableSorting: false,
+    cell: ({ row }) => <FormatBadge format={row.original.format} />,
   },
   {
     accessorKey: "views",
@@ -75,17 +125,30 @@ const columns: ColumnDef<AllVideo, unknown>[] = [
     ),
   },
   {
-    accessorKey: "format",
-    header: "Format",
-    enableSorting: false,
-    cell: ({ row }) => <FormatBadge format={row.original.format} />,
+    id: "engRate",
+    header: "Eng. Rate",
+    accessorFn: (row) =>
+      calcEngagementRate(row.views, row.likes, row.comments, row.shares),
+    cell: ({ row }) => {
+      const rate = calcEngagementRate(
+        row.original.views,
+        row.original.likes,
+        row.original.comments,
+        row.original.shares
+      );
+      return (
+        <span className="tabular-nums text-xs font-medium">
+          {formatEngagementRate(rate)}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "postedAt",
     header: "Posted",
     cell: ({ row }) => (
       <span className="text-xs text-muted-foreground">
-        {formatDate(row.original.postedAt)}
+        {relativeDate(row.original.postedAt)}
       </span>
     ),
   },
@@ -93,7 +156,9 @@ const columns: ColumnDef<AllVideo, unknown>[] = [
     id: "tier",
     header: "Tier",
     enableSorting: false,
-    cell: ({ row }) => <ViralTierBadge tier={getViralTier(row.original.views)} />,
+    cell: ({ row }) => (
+      <ViralTierBadge tier={getViralTier(row.original.views)} />
+    ),
   },
   {
     id: "actions",
@@ -127,7 +192,7 @@ export function VideosClient({
   apps: { id: string; name: string; color: string }[];
   totalCount: number;
 }) {
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list">("list");
   const [search, setSearch] = useState("");
   const [appFilter, setAppFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
@@ -141,7 +206,8 @@ export function VideosClient({
       result = result.filter(
         (v) =>
           v.description.toLowerCase().includes(q) ||
-          v.hashtags.some((h) => h.toLowerCase().includes(q))
+          v.hashtags.some((h) => h.toLowerCase().includes(q)) ||
+          (v.hook && v.hook.toLowerCase().includes(q))
       );
     }
     if (appFilter !== "all") {
@@ -162,7 +228,10 @@ export function VideosClient({
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const formatOptions = Object.entries(FORMAT_LABELS) as [VideoFormat, string][];
+  const formatOptions = Object.entries(FORMAT_LABELS) as [
+    VideoFormat,
+    string,
+  ][];
 
   return (
     <div className="flex flex-col gap-4">
@@ -170,7 +239,7 @@ export function VideosClient({
         <div className="relative flex-1 md:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search description or hashtags..."
+            placeholder="Search description, hooks, or hashtags..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -182,7 +251,7 @@ export function VideosClient({
 
         <Select
           value={appFilter}
-          onValueChange={(val: string | null) => {
+          onValueChange={(val) => {
             setAppFilter(val ?? "all");
             setPage(0);
           }}
@@ -202,7 +271,7 @@ export function VideosClient({
 
         <Select
           value={formatFilter}
-          onValueChange={(val: string | null) => {
+          onValueChange={(val) => {
             setFormatFilter(val ?? "all");
             setPage(0);
           }}
@@ -237,7 +306,8 @@ export function VideosClient({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Showing {paged.length} of {filtered.length} videos (total: {formatNumber(totalCount)})
+        Showing {paged.length} of {filtered.length} videos (total:{" "}
+        {formatNumber(totalCount)})
       </p>
 
       {view === "grid" ? (

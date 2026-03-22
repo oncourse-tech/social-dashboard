@@ -7,6 +7,8 @@ export type SummaryCardItem = {
   value: number;
   icon?: React.ReactNode;
   highlight?: string;
+  textValue?: string;
+  suffix?: string;
 };
 
 export function SummaryCards({ items }: { items: SummaryCardItem[] }) {
@@ -27,7 +29,9 @@ export function SummaryCards({ items }: { items: SummaryCardItem[] }) {
                 )}
                 style={item.highlight ? { color: item.highlight } : undefined}
               >
-                {formatNumber(item.value)}
+                {item.textValue
+                  ? item.textValue
+                  : `${formatNumber(item.value)}${item.suffix ?? ""}`}
               </p>
             </div>
           </CardContent>

@@ -5,6 +5,8 @@ import { SummaryCards } from "@/components/summary-cards";
 import { AddAccountDialog } from "@/components/add-account-dialog";
 import { AccountsTable } from "./accounts-table";
 import type { AccountWithStats } from "@/types";
+import { FORMAT_LABELS } from "@/lib/constants";
+import { type VideoFormat } from "@prisma/client";
 
 export default async function AccountsPage({
   searchParams,
@@ -22,7 +24,7 @@ export default async function AccountsPage({
     where: appFilter ? { appId: appFilter } : undefined,
     include: {
       app: { select: { id: true, name: true, color: true } },
-      videos: { select: { views: true, postedAt: true } },
+      videos: { select: { views: true, postedAt: true, format: true } },
     },
     orderBy: { username: "asc" },
   });
@@ -38,40 +40,50 @@ export default async function AccountsPage({
   let grandFollowers = 0;
   let grandVideos = 0;
 
-  const enrichedAccounts: AccountWithStats[] = accounts.map((account) => {
-    let videos7d = 0;
-    let viral5k = 0;
-    let viral10k = 0;
-    let viral50k = 0;
+  const enrichedAccounts: (AccountWithStats & { dominantFormat: string | null })[] =
+    accounts.map((account) => {
+      let videos7d = 0;
+      let viral5k = 0;
+      let viral10k = 0;
+      let viral50k = 0;
+      const formatCounts: Record<string, number> = {};
 
-    for (const video of account.videos) {
-      if (video.postedAt >= sevenDaysAgo) videos7d++;
-      if (video.views >= threshold2) viral50k++;
-      else if (video.views >= 10000) viral10k++;
-      else if (video.views >= threshold1) viral5k++;
-    }
+      for (const video of account.videos) {
+        if (video.postedAt >= sevenDaysAgo) videos7d++;
+        if (video.views >= threshold2) viral50k++;
+        else if (video.views >= 10000) viral10k++;
+        else if (video.views >= threshold1) viral5k++;
 
-    grandFollowers += account.followers;
-    grandVideos += account.videos.length;
+        formatCounts[video.format] = (formatCounts[video.format] || 0) + 1;
+      }
 
-    return {
-      id: account.id,
-      username: account.username,
-      displayName: account.displayName,
-      avatarUrl: account.avatarUrl,
-      followers: account.followers,
-      totalLikes: account.totalLikes,
-      totalVideos: account.videos.length,
-      lastPostedAt: account.lastPostedAt,
-      lastSyncedAt: account.lastSyncedAt,
-      trackingSince: account.trackingSince,
-      app: account.app,
-      videos7d,
-      viral5k,
-      viral10k,
-      viral50k,
-    };
-  });
+      grandFollowers += account.followers;
+      grandVideos += account.videos.length;
+
+      const topFormatEntry = Object.entries(formatCounts).sort(
+        (a, b) => b[1] - a[1]
+      )[0];
+      const dominantFormat = topFormatEntry ? topFormatEntry[0] : null;
+
+      return {
+        id: account.id,
+        username: account.username,
+        displayName: account.displayName,
+        avatarUrl: account.avatarUrl,
+        followers: account.followers,
+        totalLikes: account.totalLikes,
+        totalVideos: account.videos.length,
+        lastPostedAt: account.lastPostedAt,
+        lastSyncedAt: account.lastSyncedAt,
+        trackingSince: account.trackingSince,
+        app: account.app,
+        videos7d,
+        viral5k,
+        viral10k,
+        viral50k,
+        dominantFormat,
+      };
+    });
 
   const filterApp = appFilter
     ? apps.find((a) => a.id === appFilter)

@@ -13,6 +13,8 @@ import { SummaryCards } from "@/components/summary-cards";
 import { AddAppDialog } from "@/components/add-app-dialog";
 import { AppsTable } from "./apps-table";
 import type { AppWithStats } from "@/types";
+import { FORMAT_LABELS } from "@/lib/constants";
+import { type VideoFormat } from "@prisma/client";
 
 export default async function AppsPage() {
   const settings = await db.settings.findFirst({ where: { id: "default" } });
@@ -24,7 +26,7 @@ export default async function AppsPage() {
       trackedAccounts: {
         include: {
           videos: {
-            select: { views: true, postedAt: true },
+            select: { views: true, postedAt: true, format: true },
           },
         },
       },
@@ -41,13 +43,14 @@ export default async function AppsPage() {
   let grandViral5k = 0;
   let grandViral50k = 0;
 
-  const enrichedApps: AppWithStats[] = apps.map((app) => {
+  const enrichedApps: (AppWithStats & { topFormat: string })[] = apps.map((app) => {
     let totalFollowers = 0;
     let totalLikes = 0;
     let totalVideos = 0;
     let videos7d = 0;
     let viral5k = 0;
     let viral50k = 0;
+    const formatCounts: Record<string, number> = {};
 
     for (const account of app.trackedAccounts) {
       totalFollowers += account.followers;
@@ -58,6 +61,8 @@ export default async function AppsPage() {
         if (video.postedAt >= sevenDaysAgo) videos7d++;
         if (video.views >= threshold2) viral50k++;
         else if (video.views >= threshold1) viral5k++;
+
+        formatCounts[video.format] = (formatCounts[video.format] || 0) + 1;
       }
     }
 
@@ -66,6 +71,13 @@ export default async function AppsPage() {
     grandVideos7d += videos7d;
     grandViral5k += viral5k;
     grandViral50k += viral50k;
+
+    const topFormatEntry = Object.entries(formatCounts).sort(
+      (a, b) => b[1] - a[1]
+    )[0];
+    const topFormat = topFormatEntry
+      ? FORMAT_LABELS[topFormatEntry[0] as VideoFormat]
+      : "N/A";
 
     return {
       id: app.id,
@@ -79,6 +91,7 @@ export default async function AppsPage() {
       videos7d,
       viral5k,
       viral50k,
+      topFormat,
     };
   });
 
