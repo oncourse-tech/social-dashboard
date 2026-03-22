@@ -1,18 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ExternalLink, Eye, Heart, ChevronDown, ChevronRight, Filter, ArrowUpDown } from "lucide-react";
+import { ExternalLink, Eye, Heart, ChevronDown, ChevronRight } from "lucide-react";
 import { VideoGrid, type VideoCardData } from "@/components/video-grid";
 import { ViewToggle } from "@/components/view-toggle";
 import { AppBadge } from "@/components/app-badge";
 import { FormatBadge } from "@/components/format-badge";
 import { ViralTierBadge } from "@/components/viral-tier-badge";
-import {
-  Select,
-  SelectContent,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Select components imported via labeled-select
 import { LabeledSelect, SelectItem } from "@/components/labeled-select";
 import {
   formatNumber,
@@ -99,59 +94,52 @@ export function ViralClient({
 
   return (
     <div className="space-y-4">
-      {/* Filter bar — labeled, compact, inline */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
-        <Filter className="size-4 text-muted-foreground shrink-0" />
+      {/* Filter bar */}
+      <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+          <LabeledSelect label="App" value={appFilter} onChange={setAppFilter}>
+            <SelectItem value="all">All Apps</SelectItem>
+            {apps.map((app) => (
+              <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
+            ))}
+          </LabeledSelect>
 
-        <LabeledSelect label="App" value={appFilter} onChange={setAppFilter}>
-          <SelectItem value="all">All Apps</SelectItem>
-          {apps.map((app) => (
-            <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
-          ))}
-        </LabeledSelect>
+          <LabeledSelect label="Format" value={formatFilter} onChange={setFormatFilter}>
+            <SelectItem value="all">All Formats</SelectItem>
+            {formatOptions.map(([key, label]) => (
+              <SelectItem key={key} value={key}>{label}</SelectItem>
+            ))}
+          </LabeledSelect>
 
-        <LabeledSelect label="Format" value={formatFilter} onChange={setFormatFilter}>
-          <SelectItem value="all">All Formats</SelectItem>
-          {formatOptions.map(([key, label]) => (
-            <SelectItem key={key} value={key}>{label}</SelectItem>
-          ))}
-        </LabeledSelect>
+          <LabeledSelect label="Tier" value={tierFilter} onChange={setTierFilter}>
+            <SelectItem value="all">All Tiers</SelectItem>
+            <SelectItem value="5K+">5K+</SelectItem>
+            <SelectItem value="10K+">10K+</SelectItem>
+            <SelectItem value="50K+">50K+</SelectItem>
+          </LabeledSelect>
 
-        <LabeledSelect label="Tier" value={tierFilter} onChange={setTierFilter}>
-          <SelectItem value="all">All Tiers</SelectItem>
-          <SelectItem value="5K+">5K+</SelectItem>
-          <SelectItem value="10K+">10K+</SelectItem>
-          <SelectItem value="50K+">50K+</SelectItem>
-        </LabeledSelect>
-
-        <LabeledSelect label="Period" value={dateRange} onChange={setDateRange}>
+          <LabeledSelect label="Period" value={dateRange} onChange={setDateRange}>
           <SelectItem value="all">All Time</SelectItem>
           <SelectItem value="7d">Last 7 days</SelectItem>
           <SelectItem value="30d">Last 30 days</SelectItem>
           <SelectItem value="90d">Last 90 days</SelectItem>
         </LabeledSelect>
 
-        <div className="flex items-center gap-1.5 ml-auto">
-          <ArrowUpDown className="size-3.5 text-muted-foreground" />
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-            <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="views">Most Views</SelectItem>
-              <SelectItem value="likes">Most Likes</SelectItem>
-              <SelectItem value="engagement">Engagement Rate</SelectItem>
-              <SelectItem value="recent">Most Recent</SelectItem>
-            </SelectContent>
-          </Select>
+          <LabeledSelect label="Sort" value={sortBy} onChange={(v) => setSortBy(v as SortOption)}>
+            <SelectItem value="views">Most Views</SelectItem>
+            <SelectItem value="likes">Most Likes</SelectItem>
+            <SelectItem value="engagement">Engagement Rate</SelectItem>
+            <SelectItem value="recent">Most Recent</SelectItem>
+          </LabeledSelect>
+        </div>
 
+        <div className="flex items-center justify-between pt-1 border-t border-border/50">
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} video{filtered.length !== 1 ? "s" : ""}
+          </p>
           <ViewToggle view={view} onChange={setView} />
         </div>
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        {filtered.length} video{filtered.length !== 1 ? "s" : ""}
-      </p>
 
       {view === "grid" ? (
         <VideoGrid videos={filtered} />

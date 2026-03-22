@@ -100,13 +100,13 @@ function SidebarLogo() {
     <div className="flex h-14 items-center gap-2 border-b border-border px-4">
       <Image
         src="/oncourse-logo.svg"
-        alt="oncourse"
+        alt="Oncourse"
         width={28}
         height={28}
         className="rounded"
       />
       <span className="text-base font-semibold tracking-tight">
-        oncourse
+        Oncourse
       </span>
     </div>
   );
@@ -137,13 +137,13 @@ export function MobileHeader() {
       <div className="flex-1 flex items-center justify-center gap-2">
         <Image
           src="/oncourse-logo.svg"
-          alt="oncourse"
+          alt="Oncourse"
           width={24}
           height={24}
           className="rounded"
         />
         <span className="text-base font-semibold tracking-tight">
-          oncourse
+          Oncourse
         </span>
       </div>
 

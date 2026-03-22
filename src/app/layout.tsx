@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "Social Dashboard -- oncourse",
-  description: "TikTok competitor intelligence for oncourse",
+  title: "Social Dashboard -- Oncourse",
+  description: "TikTok competitor intelligence for Oncourse",
   icons: {
     icon: "/icon.png",
     apple: "/icon.png",

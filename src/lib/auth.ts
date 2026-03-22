@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
         // Return a static user — no DB needed for auth
         return {
           id: "oncourse-team",
-          name: "oncourse team",
+          name: "Oncourse team",
           email: "team@oncourse.internal",
         };
       },

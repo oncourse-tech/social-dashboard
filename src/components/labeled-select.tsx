@@ -20,12 +20,12 @@ export function LabeledSelect({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide shrink-0">
+    <div className="flex flex-col gap-0.5 min-w-0 flex-1 sm:flex-initial">
+      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
         {label}
       </span>
       <Select value={value} onValueChange={(val) => onChange(val ?? value)}>
-        <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
+        <SelectTrigger className="h-8 text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>{children}</SelectContent>

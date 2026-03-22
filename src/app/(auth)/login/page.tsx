@@ -40,15 +40,15 @@ function LoginForm() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
           <Image
-            src="/oncourse-logo.svg"
-            alt="oncourse"
+            src="/Oncourse-logo.svg"
+            alt="Oncourse"
             width={56}
             height={56}
             className="rounded-xl"
           />
           <div className="text-center">
             <h1 className="text-xl font-semibold tracking-tight">Social Dashboard</h1>
-            <p className="mt-1 text-sm text-muted-foreground">oncourse team access</p>
+            <p className="mt-1 text-sm text-muted-foreground">Oncourse team access</p>
           </div>
         </div>
 
