@@ -168,7 +168,7 @@ export function ViralClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
         <Select
           value={appFilter}
           onValueChange={(val: string | null) => setAppFilter(val ?? "all")}
@@ -211,7 +211,7 @@ export function ViralClient({
           className="w-32"
         />
 
-        <div className="ml-auto">
+        <div className="md:ml-auto">
           <ViewToggle view={view} onChange={setView} />
         </div>
       </div>
@@ -219,7 +219,9 @@ export function ViralClient({
       {view === "grid" ? (
         <VideoGrid videos={filtered} />
       ) : (
-        <DataTable columns={columns} data={filtered} />
+        <div className="overflow-x-auto">
+          <DataTable columns={columns} data={filtered} />
+        </div>
       )}
     </div>
   );

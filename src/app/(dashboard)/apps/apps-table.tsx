@@ -93,10 +93,12 @@ export function AppsTable({ data }: { data: AppWithStats[] }) {
   const router = useRouter();
 
   return (
-    <DataTable
-      columns={columns}
-      data={data}
-      onRowClick={(row) => router.push(`/accounts?app=${row.id}`)}
-    />
+    <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+      <DataTable
+        columns={columns}
+        data={data}
+        onRowClick={(row) => router.push(`/accounts?app=${row.id}`)}
+      />
+    </div>
   );
 }

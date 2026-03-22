@@ -166,8 +166,8 @@ export function VideosClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
+        <div className="relative flex-1 md:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Search description or hashtags..."
@@ -231,7 +231,7 @@ export function VideosClient({
           className="w-32"
         />
 
-        <div className="ml-auto">
+        <div className="md:ml-auto">
           <ViewToggle view={view} onChange={setView} />
         </div>
       </div>
@@ -243,7 +243,9 @@ export function VideosClient({
       {view === "grid" ? (
         <VideoGrid videos={paged} />
       ) : (
-        <DataTable columns={columns} data={paged} />
+        <div className="overflow-x-auto">
+          <DataTable columns={columns} data={paged} />
+        </div>
       )}
 
       {totalPages > 1 && (

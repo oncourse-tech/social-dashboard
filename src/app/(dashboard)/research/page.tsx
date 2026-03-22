@@ -99,7 +99,7 @@ export default function ResearchPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Account Research</h1>
 
-      <form onSubmit={handleSearch} className="flex items-center gap-3 max-w-md">
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-md">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -126,7 +126,7 @@ export default function ResearchPage() {
       )}
 
       {result && (
-        <Card className="max-w-md">
+        <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               {result.avatarUrl && (

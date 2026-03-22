@@ -93,7 +93,7 @@ export default async function AppsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-xl font-semibold">Apps Overview</h1>
         <AddAppDialog />
       </div>

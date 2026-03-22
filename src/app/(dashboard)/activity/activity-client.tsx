@@ -61,12 +61,12 @@ export function ActivityClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <Select
           value={appFilter}
           onValueChange={(val: string | null) => setAppFilter(val ?? "all")}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="All Apps" />
           </SelectTrigger>
           <SelectContent>
@@ -85,11 +85,11 @@ export function ActivityClient({
         </p>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
         <div
-          className="grid gap-1"
+          className="grid gap-1 min-w-[640px]"
           style={{
-            gridTemplateColumns: `auto repeat(24, minmax(24px, 1fr))`,
+            gridTemplateColumns: `auto repeat(24, minmax(20px, 1fr))`,
             gridTemplateRows: `auto repeat(7, 28px)`,
           }}
         >

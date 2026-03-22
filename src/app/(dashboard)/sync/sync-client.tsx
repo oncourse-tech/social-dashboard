@@ -48,8 +48,8 @@ export function SyncClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        <Button onClick={handleSync} disabled={syncing}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <Button onClick={handleSync} disabled={syncing} className="w-full sm:w-auto">
           {syncing ? (
             <>
               <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
@@ -69,8 +69,8 @@ export function SyncClient({
         )}
       </div>
 
-      <div className="rounded-lg border border-border">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border border-border overflow-x-auto -mx-4 sm:mx-0">
+        <table className="w-full text-sm min-w-[540px]">
           <thead>
             <tr className="border-b border-border">
               <th className="px-4 py-2 text-left font-medium text-muted-foreground w-8" />

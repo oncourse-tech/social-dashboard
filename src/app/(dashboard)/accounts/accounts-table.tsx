@@ -139,7 +139,7 @@ export function AccountsTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -172,11 +172,13 @@ export function AccountsTable({
           </SelectContent>
         </Select>
       </div>
-      <DataTable
-        columns={columns}
-        data={filtered}
-        onRowClick={(row) => router.push(`/accounts/${row.username}`)}
-      />
+      <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+        <DataTable
+          columns={columns}
+          data={filtered}
+          onRowClick={(row) => router.push(`/accounts/${row.username}`)}
+        />
+      </div>
     </div>
   );
 }

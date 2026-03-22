@@ -76,7 +76,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-lg">
+    <div className="flex flex-col gap-6 w-full max-w-lg">
       <h1 className="text-xl font-semibold">Settings</h1>
 
       <form onSubmit={handleSave} className="flex flex-col gap-6">
@@ -166,7 +166,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="w-full sm:w-auto">
           {saving ? (
             <>
               <Loader2 className="size-4 animate-spin" data-icon="inline-start" />

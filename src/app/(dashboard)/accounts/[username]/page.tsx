@@ -71,7 +71,7 @@ export default async function AccountDetailPage({
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:gap-4">
         <Avatar size="lg">
           {account.avatarUrl ? (
             <AvatarImage src={account.avatarUrl} alt={account.username} />
@@ -82,27 +82,25 @@ export default async function AccountDetailPage({
         </Avatar>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">@{account.username}</h1>
+            <h1 className="text-lg md:text-xl font-semibold">@{account.username}</h1>
             <AppBadge
               name={account.app.name}
               color={account.app.color}
             />
           </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              Tracking since {formatDate(account.trackingSince)}
-            </span>
-            <a
-              href={`https://www.tiktok.com/@${account.username}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="ghost" size="xs">
-                <ExternalLink className="size-3" data-icon="inline-start" />
-                View on TikTok
-              </Button>
-            </a>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Tracking since {formatDate(account.trackingSince)}
+          </p>
+          <a
+            href={`https://www.tiktok.com/@${account.username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="ghost" size="xs">
+              <ExternalLink className="size-3" data-icon="inline-start" />
+              View on TikTok
+            </Button>
+          </a>
         </div>
       </div>
 
@@ -111,7 +109,7 @@ export default async function AccountDetailPage({
 
       {/* Viral tier breakdown */}
       {viralTotal > 0 && (
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-sm text-muted-foreground">
           <span>Viral breakdown:</span>
           {viral5k > 0 && (
             <span className="text-yellow-400">{viral5k} at 5K+</span>

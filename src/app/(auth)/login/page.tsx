@@ -36,7 +36,7 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <div className="w-full max-w-xs space-y-8">
+      <div className="w-full max-w-xs space-y-8 px-4 sm:px-0">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
           <Image

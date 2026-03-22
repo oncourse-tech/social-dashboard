@@ -86,7 +86,7 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-lg">
+    <div className="flex flex-col gap-6 w-full max-w-lg">
       <h1 className="text-xl font-semibold">Bulk Import</h1>
 
       <div className="flex flex-col gap-3">
@@ -121,16 +121,17 @@ export default function ImportPage() {
           </Select>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={handlePreview}
             disabled={!text.trim()}
+            className="w-full sm:w-auto"
           >
             Preview
           </Button>
           {previewing && parsed.length > 0 && (
-            <Button onClick={handleImport} disabled={importing || !appId}>
+            <Button onClick={handleImport} disabled={importing || !appId} className="w-full sm:w-auto">
               {importing ? (
                 <>
                   <Loader2 className="size-4 animate-spin" data-icon="inline-start" />

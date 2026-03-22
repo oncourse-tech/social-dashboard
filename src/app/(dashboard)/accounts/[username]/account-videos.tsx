@@ -126,8 +126,8 @@ export function AccountVideos({
         <ViewToggle view={view} onChange={setView} />
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+        <div className="relative flex-1 md:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Search description or hashtag..."
@@ -154,7 +154,9 @@ export function AccountVideos({
       {view === "grid" ? (
         <VideoGrid videos={filtered} />
       ) : (
-        <DataTable columns={listColumns} data={filtered} />
+        <div className="overflow-x-auto">
+          <DataTable columns={listColumns} data={filtered} />
+        </div>
       )}
     </div>
   );
