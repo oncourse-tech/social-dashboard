@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { AuthenticatedShell } from "@/components/authenticated-shell";
 
 export const metadata: Metadata = {
   title: "Social Dashboard -- oncourse",
@@ -18,14 +17,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className="dark h-full antialiased"
-    >
+    <html lang="en" className="dark h-full antialiased">
       <body className="min-h-full">
-        <Providers>
-          <AuthenticatedShell>{children}</AuthenticatedShell>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
