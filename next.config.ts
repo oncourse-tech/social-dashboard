@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["apify-client", "next-auth"],
+  serverExternalPackages: ["apify-client"],
   turbopack: {
     root: __dirname,
   },
