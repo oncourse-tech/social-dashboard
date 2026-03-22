@@ -7,7 +7,7 @@ import { db } from "./db";
 const TEAM_PASSWORD = process.env.TEAM_PASSWORD || "oncourse2026";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db),
+  // No adapter — using JWT sessions with credentials provider
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
