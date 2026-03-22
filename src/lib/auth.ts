@@ -14,9 +14,13 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        console.log("[AUTH] authorize called, password length:", credentials?.password?.length, "expected length:", TEAM_PASSWORD.length);
+        console.log("[AUTH] match:", credentials?.password === TEAM_PASSWORD);
+
         if (!credentials?.password) return null;
 
         if (credentials.password !== TEAM_PASSWORD) {
+          console.log("[AUTH] password mismatch");
           return null;
         }
 
