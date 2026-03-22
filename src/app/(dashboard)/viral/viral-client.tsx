@@ -1,28 +1,19 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { type ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Eye, Heart, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, Eye, Heart, ChevronDown, ChevronRight, Filter, ArrowUpDown } from "lucide-react";
 import { VideoGrid, type VideoCardData } from "@/components/video-grid";
-import { DataTable } from "@/components/data-table";
 import { ViewToggle } from "@/components/view-toggle";
 import { AppBadge } from "@/components/app-badge";
 import { FormatBadge } from "@/components/format-badge";
 import { ViralTierBadge } from "@/components/viral-tier-badge";
 import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
-import {
   Select,
   SelectContent,
-  SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import { LabeledSelect, SelectItem } from "@/components/labeled-select";
 import {
   formatNumber,
   getViralTier,
@@ -37,66 +28,12 @@ type ViralVideo = VideoCardData & {
   hook: string | null;
   script: string | null;
   cta: string | null;
+  videoUrl?: string | null;
   account: { username: string };
   app: { id: string; name: string; color: string };
 };
 
 type SortOption = "views" | "likes" | "engagement" | "recent";
-
-function HookCell({ video }: { video: ViralVideo }) {
-  const hookText = video.hook || "";
-  const fallbackText = !hookText
-    ? (video.description || "").slice(0, 60)
-    : "";
-  const displayText = hookText || fallbackText;
-
-  if (!displayText) {
-    return <span className="text-xs text-muted-foreground italic">No hook</span>;
-  }
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger className="text-left">
-          <p
-            className={`line-clamp-2 text-sm leading-snug ${
-              !hookText ? "text-muted-foreground" : "text-foreground"
-            }`}
-          >
-            {displayText}
-          </p>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" align="start" className="max-w-sm">
-          {hookText || fallbackText}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-function ExpandedRow({ video }: { video: ViralVideo }) {
-  return (
-    <div className="px-4 py-3 space-y-2 bg-muted/30 text-sm">
-      {video.script && (
-        <div>
-          <span className="font-medium text-muted-foreground">Script: </span>
-          <span className="text-foreground">{video.script}</span>
-        </div>
-      )}
-      {video.cta && (
-        <div>
-          <span className="font-medium text-muted-foreground">CTA: </span>
-          <span className="text-foreground">{video.cta}</span>
-        </div>
-      )}
-      {!video.script && !video.cta && (
-        <span className="text-muted-foreground italic">
-          No script or CTA data available
-        </span>
-      )}
-    </div>
-  );
-}
 
 export function ViralClient({
   videos,
@@ -125,12 +62,8 @@ export function ViralClient({
   const filtered = useMemo(() => {
     let result = videos;
 
-    if (appFilter !== "all") {
-      result = result.filter((v) => v.app.id === appFilter);
-    }
-    if (formatFilter !== "all") {
-      result = result.filter((v) => v.format === formatFilter);
-    }
+    if (appFilter !== "all") result = result.filter((v) => v.app.id === appFilter);
+    if (formatFilter !== "all") result = result.filter((v) => v.format === formatFilter);
     if (tierFilter !== "all") {
       result = result.filter((v) => {
         const tier = getViralTier(v.views);
@@ -142,39 +75,22 @@ export function ViralClient({
     }
     if (dateRange !== "all") {
       const now = new Date();
-      let cutoff: Date;
-      if (dateRange === "7d") {
-        cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (dateRange === "30d") {
-        cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      } else {
-        cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      }
+      const days = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90;
+      const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
       result = result.filter((v) => new Date(v.postedAt) >= cutoff);
     }
 
-    // Sort
     const sorted = [...result];
     switch (sortBy) {
-      case "views":
-        sorted.sort((a, b) => b.views - a.views);
-        break;
-      case "likes":
-        sorted.sort((a, b) => b.likes - a.likes);
-        break;
-      case "engagement":
-        sorted.sort((a, b) => {
-          const ea = calcEngagementRate(a.views, a.likes, a.comments, a.shares);
-          const eb = calcEngagementRate(b.views, b.likes, b.comments, b.shares);
-          return eb - ea;
-        });
-        break;
-      case "recent":
-        sorted.sort(
-          (a, b) =>
-            new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()
-        );
-        break;
+      case "views": sorted.sort((a, b) => b.views - a.views); break;
+      case "likes": sorted.sort((a, b) => b.likes - a.likes); break;
+      case "engagement": sorted.sort((a, b) =>
+        calcEngagementRate(b.views, b.likes, b.comments, b.shares) -
+        calcEngagementRate(a.views, a.likes, a.comments, a.shares)
+      ); break;
+      case "recent": sorted.sort((a, b) =>
+        new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()
+      ); break;
     }
     return sorted;
   }, [videos, appFilter, formatFilter, tierFilter, dateRange, sortBy]);
@@ -182,222 +98,190 @@ export function ViralClient({
   const formatOptions = Object.entries(FORMAT_LABELS) as [VideoFormat, string][];
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Filter bar */}
-      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
-        <Select value={appFilter} onValueChange={(val) => setAppFilter(val ?? "all")}>
-          <SelectTrigger>
-            <SelectValue placeholder="All Apps" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Apps</SelectItem>
-            {apps.map((app) => (
-              <SelectItem key={app.id} value={app.id}>
-                {app.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="space-y-4">
+      {/* Filter bar — labeled, compact, inline */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <Filter className="size-4 text-muted-foreground shrink-0" />
 
-        <Select value={formatFilter} onValueChange={(val) => setFormatFilter(val ?? "all")}>
-          <SelectTrigger>
-            <SelectValue placeholder="All Formats" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Formats</SelectItem>
-            {formatOptions.map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <LabeledSelect label="App" value={appFilter} onChange={setAppFilter}>
+          <SelectItem value="all">All Apps</SelectItem>
+          {apps.map((app) => (
+            <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
+          ))}
+        </LabeledSelect>
 
-        <Select value={tierFilter} onValueChange={(val) => setTierFilter(val ?? "all")}>
-          <SelectTrigger>
-            <SelectValue placeholder="All Tiers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tiers</SelectItem>
-            <SelectItem value="5K+">5K+</SelectItem>
-            <SelectItem value="10K+">10K+</SelectItem>
-            <SelectItem value="50K+">50K+</SelectItem>
-          </SelectContent>
-        </Select>
+        <LabeledSelect label="Format" value={formatFilter} onChange={setFormatFilter}>
+          <SelectItem value="all">All Formats</SelectItem>
+          {formatOptions.map(([key, label]) => (
+            <SelectItem key={key} value={key}>{label}</SelectItem>
+          ))}
+        </LabeledSelect>
 
-        <Select value={dateRange} onValueChange={(val) => setDateRange(val ?? "all")}>
-          <SelectTrigger>
-            <SelectValue placeholder="All Time" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-            <SelectItem value="90d">Last 90 days</SelectItem>
-          </SelectContent>
-        </Select>
+        <LabeledSelect label="Tier" value={tierFilter} onChange={setTierFilter}>
+          <SelectItem value="all">All Tiers</SelectItem>
+          <SelectItem value="5K+">5K+</SelectItem>
+          <SelectItem value="10K+">10K+</SelectItem>
+          <SelectItem value="50K+">50K+</SelectItem>
+        </LabeledSelect>
 
-        <Select value={sortBy} onValueChange={(val) => setSortBy((val as SortOption) ?? "views")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="views">Most Views</SelectItem>
-            <SelectItem value="likes">Most Likes</SelectItem>
-            <SelectItem value="engagement">Highest Engagement</SelectItem>
-            <SelectItem value="recent">Most Recent</SelectItem>
-          </SelectContent>
-        </Select>
+        <LabeledSelect label="Period" value={dateRange} onChange={setDateRange}>
+          <SelectItem value="all">All Time</SelectItem>
+          <SelectItem value="7d">Last 7 days</SelectItem>
+          <SelectItem value="30d">Last 30 days</SelectItem>
+          <SelectItem value="90d">Last 90 days</SelectItem>
+        </LabeledSelect>
 
-        <div className="md:ml-auto">
+        <div className="flex items-center gap-1.5 ml-auto">
+          <ArrowUpDown className="size-3.5 text-muted-foreground" />
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+            <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="views">Most Views</SelectItem>
+              <SelectItem value="likes">Most Likes</SelectItem>
+              <SelectItem value="engagement">Engagement Rate</SelectItem>
+              <SelectItem value="recent">Most Recent</SelectItem>
+            </SelectContent>
+          </Select>
+
           <ViewToggle view={view} onChange={setView} />
         </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Showing {filtered.length} viral videos
+        {filtered.length} video{filtered.length !== 1 ? "s" : ""}
       </p>
 
       {view === "grid" ? (
         <VideoGrid videos={filtered} />
       ) : (
-        <div className="overflow-x-auto">
-          <div className="rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="w-8 px-2 py-2"></th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground w-[40%]">
-                    Hook
-                  </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
-                    Creator
-                  </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
-                    App
-                  </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
-                    Format
-                  </th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">
-                    Views
-                  </th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">
-                    Likes
-                  </th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">
-                    Eng. Rate
-                  </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
-                    Posted
-                  </th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">
-                    Tier
-                  </th>
-                  <th className="w-10 px-2 py-2"></th>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[900px]">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                <th className="w-8 p-2" />
+                <th className="p-2 text-left" style={{ width: "35%" }}>Hook</th>
+                <th className="p-2 text-left whitespace-nowrap">Creator</th>
+                <th className="p-2 text-left">App</th>
+                <th className="p-2 text-left">Format</th>
+                <th className="p-2 text-right whitespace-nowrap">Views</th>
+                <th className="p-2 text-right whitespace-nowrap">Likes</th>
+                <th className="p-2 text-right whitespace-nowrap">Eng %</th>
+                <th className="p-2 text-left whitespace-nowrap">Posted</th>
+                <th className="p-2 text-center">Tier</th>
+                <th className="w-8 p-2" />
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="h-24 text-center text-muted-foreground">
+                    No videos match your filters.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      No results.
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((video) => {
-                    const isExpanded = expandedRows.has(video.id);
-                    const engRate = calcEngagementRate(
-                      video.views,
-                      video.likes,
-                      video.comments,
-                      video.shares
-                    );
-                    const tier = getViralTier(video.views);
-                    const tiktokUrl = `https://www.tiktok.com/@${video.account.username}/video/${video.tiktokVideoId}`;
+              ) : (
+                filtered.map((video) => {
+                  const isExpanded = expandedRows.has(video.id);
+                  const engRate = calcEngagementRate(video.views, video.likes, video.comments, video.shares);
+                  const tier = getViralTier(video.views);
+                  const hookText = video.hook || video.description?.slice(0, 80) || "";
+                  const tiktokUrl = video.videoUrl || `https://www.tiktok.com/@${video.account.username}/video/${video.tiktokVideoId}`;
 
-                    return (
-                      <tr key={video.id} className="group">
-                        <td colSpan={11} className="p-0">
-                          <div
-                            className="flex items-center border-b border-border hover:bg-muted/30 cursor-pointer"
-                            onClick={() => toggleRow(video.id)}
+                  return (
+                    <tbody key={video.id}>
+                      <tr
+                        className="border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
+                        onClick={() => toggleRow(video.id)}
+                      >
+                        <td className="p-2 text-center">
+                          {isExpanded
+                            ? <ChevronDown className="size-3.5 text-muted-foreground mx-auto" />
+                            : <ChevronRight className="size-3.5 text-muted-foreground mx-auto" />
+                          }
+                        </td>
+                        <td className="p-2">
+                          <p className={`line-clamp-2 text-[13px] leading-snug ${video.hook ? "text-foreground" : "text-muted-foreground"}`}>
+                            {hookText}
+                          </p>
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          <span className="text-xs font-medium">@{video.account.username}</span>
+                        </td>
+                        <td className="p-2">
+                          <AppBadge name={video.app.name} color={video.app.color} />
+                        </td>
+                        <td className="p-2">
+                          <FormatBadge format={video.format} />
+                        </td>
+                        <td className="p-2 text-right tabular-nums">
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            <Eye className="size-3 text-muted-foreground" />
+                            {formatNumber(video.views)}
+                          </span>
+                        </td>
+                        <td className="p-2 text-right tabular-nums">
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            <Heart className="size-3 text-muted-foreground" />
+                            {formatNumber(video.likes)}
+                          </span>
+                        </td>
+                        <td className="p-2 text-right">
+                          <span className="text-xs font-semibold tabular-nums">
+                            {formatEngagementRate(engRate)}
+                          </span>
+                        </td>
+                        <td className="p-2 whitespace-nowrap">
+                          <span className="text-xs text-muted-foreground">{relativeDate(video.postedAt)}</span>
+                        </td>
+                        <td className="p-2 text-center">
+                          <ViralTierBadge tier={tier} />
+                        </td>
+                        <td className="p-2 text-center">
+                          <a
+                            href={tiktokUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <div className="w-8 px-2 py-2.5 flex items-center justify-center">
-                              {isExpanded ? (
-                                <ChevronDown className="size-3.5 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="size-3.5 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div className="w-[40%] px-3 py-2.5">
-                              <HookCell video={video} />
-                            </div>
-                            <div className="px-3 py-2.5">
-                              <span className="font-medium text-xs">
-                                @{video.account.username}
-                              </span>
-                            </div>
-                            <div className="px-3 py-2.5">
-                              <AppBadge
-                                name={video.app.name}
-                                color={video.app.color}
-                              />
-                            </div>
-                            <div className="px-3 py-2.5">
-                              <FormatBadge format={video.format} />
-                            </div>
-                            <div className="px-3 py-2.5 text-right">
-                              <span className="flex items-center justify-end gap-1 tabular-nums text-xs">
-                                <Eye className="size-3 text-muted-foreground" />
-                                {formatNumber(video.views)}
-                              </span>
-                            </div>
-                            <div className="px-3 py-2.5 text-right">
-                              <span className="flex items-center justify-end gap-1 tabular-nums text-xs">
-                                <Heart className="size-3 text-muted-foreground" />
-                                {formatNumber(video.likes)}
-                              </span>
-                            </div>
-                            <div className="px-3 py-2.5 text-right">
-                              <span className="tabular-nums text-xs font-medium">
-                                {formatEngagementRate(engRate)}
-                              </span>
-                            </div>
-                            <div className="px-3 py-2.5">
-                              <span className="text-xs text-muted-foreground">
-                                {relativeDate(video.postedAt)}
-                              </span>
-                            </div>
-                            <div className="px-3 py-2.5">
-                              <ViralTierBadge tier={tier} />
-                            </div>
-                            <div className="w-10 px-2 py-2.5">
-                              <a
-                                href={tiktokUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="size-4" />
-                              </a>
-                            </div>
-                          </div>
-                          {isExpanded && <ExpandedRow video={video} />}
+                            <ExternalLink className="size-3.5" />
+                          </a>
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                      {isExpanded && (
+                        <tr className="bg-muted/10">
+                          <td />
+                          <td colSpan={10} className="p-3">
+                            <div className="space-y-1.5 text-xs">
+                              {video.script && (
+                                <div>
+                                  <span className="font-semibold text-muted-foreground">Script: </span>
+                                  <span>{video.script}</span>
+                                </div>
+                              )}
+                              {video.cta && (
+                                <div>
+                                  <span className="font-semibold text-muted-foreground">CTA: </span>
+                                  <span>{video.cta}</span>
+                                </div>
+                              )}
+                              {!video.script && !video.cta && (
+                                <span className="text-muted-foreground italic">No analysis data</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
+

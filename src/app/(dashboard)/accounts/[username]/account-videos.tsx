@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Search } from "lucide-react";
+import { ExternalLink, Search, Filter } from "lucide-react";
 import { VideoFormat } from "@prisma/client";
 import { ViewToggle } from "@/components/view-toggle";
 import { VideoGrid, type VideoCardData } from "@/components/video-grid";
@@ -16,13 +16,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { LabeledSelect, SelectItem } from "@/components/labeled-select";
 import {
   formatNumber,
   getViralTier,
@@ -211,46 +205,32 @@ export function AccountVideos({
         <ViewToggle view={view} onChange={setView} />
       </div>
 
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-        <div className="relative flex-1 md:max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search description, hooks, or hashtags..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <Select
-          value={formatFilter}
-          onValueChange={(val) => setFormatFilter(val ?? "all")}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All Formats" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Formats</SelectItem>
-            {FORMAT_OPTIONS.map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={dateRange}
-          onValueChange={(val) => setDateRange(val ?? "all")}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All Time" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-            <SelectItem value="90d">Last 90 days</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="relative max-w-xs">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Search description, hooks, or hashtags..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <Filter className="size-4 text-muted-foreground shrink-0" />
+
+        <LabeledSelect label="Format" value={formatFilter} onChange={(val) => setFormatFilter(val)}>
+          <SelectItem value="all">All Formats</SelectItem>
+          {FORMAT_OPTIONS.map(([value, label]) => (
+            <SelectItem key={value} value={value}>{label}</SelectItem>
+          ))}
+        </LabeledSelect>
+
+        <LabeledSelect label="Period" value={dateRange} onChange={(val) => setDateRange(val)}>
+          <SelectItem value="all">All Time</SelectItem>
+          <SelectItem value="7d">Last 7 days</SelectItem>
+          <SelectItem value="30d">Last 30 days</SelectItem>
+          <SelectItem value="90d">Last 90 days</SelectItem>
+        </LabeledSelect>
       </div>
 
       {view === "grid" ? (

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Eye, Heart, Search } from "lucide-react";
+import { ExternalLink, Eye, Heart, Search, Filter } from "lucide-react";
 import { VideoGrid, type VideoCardData } from "@/components/video-grid";
 import { DataTable } from "@/components/data-table";
 import { ViewToggle } from "@/components/view-toggle";
@@ -11,13 +11,7 @@ import { FormatBadge } from "@/components/format-badge";
 import { ViralTierBadge } from "@/components/viral-tier-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { LabeledSelect, SelectItem } from "@/components/labeled-select";
 import {
   Tooltip,
   TooltipTrigger,
@@ -235,59 +229,35 @@ export function VideosClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
-        <div className="relative flex-1 md:max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search description, hooks, or hashtags..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
-            className="pl-8"
-          />
-        </div>
-
-        <Select
-          value={appFilter}
-          onValueChange={(val) => {
-            setAppFilter(val ?? "all");
+      <div className="relative max-w-xs">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Search description, hooks, or hashtags..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
             setPage(0);
           }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All Apps" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Apps</SelectItem>
-            {apps.map((app) => (
-              <SelectItem key={app.id} value={app.id}>
-                {app.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          className="pl-8"
+        />
+      </div>
 
-        <Select
-          value={formatFilter}
-          onValueChange={(val) => {
-            setFormatFilter(val ?? "all");
-            setPage(0);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All Formats" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Formats</SelectItem>
-            {formatOptions.map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <Filter className="size-4 text-muted-foreground shrink-0" />
+
+        <LabeledSelect label="App" value={appFilter} onChange={(val) => { setAppFilter(val); setPage(0); }}>
+          <SelectItem value="all">All Apps</SelectItem>
+          {apps.map((app) => (
+            <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
+          ))}
+        </LabeledSelect>
+
+        <LabeledSelect label="Format" value={formatFilter} onChange={(val) => { setFormatFilter(val); setPage(0); }}>
+          <SelectItem value="all">All Formats</SelectItem>
+          {formatOptions.map(([key, label]) => (
+            <SelectItem key={key} value={key}>{label}</SelectItem>
+          ))}
+        </LabeledSelect>
 
         <Input
           type="number"
@@ -297,10 +267,10 @@ export function VideosClient({
             setMinViews(e.target.value);
             setPage(0);
           }}
-          className="w-32"
+          className="w-32 h-8 text-xs"
         />
 
-        <div className="md:ml-auto">
+        <div className="ml-auto">
           <ViewToggle view={view} onChange={setView} />
         </div>
       </div>

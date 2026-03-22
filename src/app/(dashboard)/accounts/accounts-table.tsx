@@ -3,17 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Search } from "lucide-react";
+import { ExternalLink, Search, Filter } from "lucide-react";
 import { DataTable } from "@/components/data-table";
 import { AppBadge } from "@/components/app-badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { LabeledSelect, SelectItem } from "@/components/labeled-select";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { FORMAT_LABELS } from "@/lib/constants";
 import { type VideoFormat } from "@prisma/client";
@@ -161,54 +155,42 @@ export function AccountsTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search accounts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <Select
+      <div className="relative max-w-xs">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Search accounts..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <Filter className="size-4 text-muted-foreground shrink-0" />
+
+        <LabeledSelect
+          label="App"
           value={currentAppFilter ?? "all"}
-          onValueChange={(val: string | null) => {
-            if (!val || val === "all") {
+          onChange={(val) => {
+            if (val === "all") {
               router.push("/accounts");
             } else {
               router.push(`/accounts?app=${val}`);
             }
           }}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="All Apps" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Apps</SelectItem>
-            {apps.map((app) => (
-              <SelectItem key={app.id} value={app.id}>
-                {app.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={formatFilter}
-          onValueChange={(val) => setFormatFilter(val ?? "all")}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="All Formats" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Formats</SelectItem>
-            {FORMAT_OPTIONS.map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <SelectItem value="all">All Apps</SelectItem>
+          {apps.map((app) => (
+            <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
+          ))}
+        </LabeledSelect>
+
+        <LabeledSelect label="Format" value={formatFilter} onChange={(val) => setFormatFilter(val)}>
+          <SelectItem value="all">All Formats</SelectItem>
+          {FORMAT_OPTIONS.map(([value, label]) => (
+            <SelectItem key={value} value={value}>{label}</SelectItem>
+          ))}
+        </LabeledSelect>
       </div>
       <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
         <DataTable
