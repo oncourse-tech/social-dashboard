@@ -127,13 +127,14 @@ async function main() {
     },
   });
 
-  console.log(`Found ${videos.length} videos to analyze${viralOnly ? " (viral only)" : ""}`);
+  const CONCURRENCY = 30;
+  console.log(`Found ${videos.length} videos to analyze${viralOnly ? " (viral only)" : ""} (concurrency: ${CONCURRENCY})`);
   if (limit) console.log(`Processing first ${limit}`);
 
   let processed = 0;
   let errors = 0;
 
-  for (const video of videos) {
+  async function processVideo(video: typeof videos[number]) {
     try {
       const analysis = await analyzeVideo({
         description: video.description,
@@ -158,16 +159,17 @@ async function main() {
       console.log(
         `  [${processed}/${videos.length}] @${video.account.username} | ${video.views} views | ${analysis.format} | "${hookPreview}"`
       );
-
-      // Rate limit: ~10 requests per minute for Gemini free tier
-      // Adjust if you have a paid plan
-      await sleep(2000);
     } catch (err: any) {
       errors++;
       console.error(`  ERROR @${video.account.username} (${video.id}): ${err.message}`);
-      // Back off on errors
-      await sleep(5000);
     }
+  }
+
+  // Process in batches of CONCURRENCY
+  for (let i = 0; i < videos.length; i += CONCURRENCY) {
+    const batch = videos.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(processVideo));
+    console.log(`  --- batch ${Math.floor(i / CONCURRENCY) + 1} complete (${Math.min(i + CONCURRENCY, videos.length)}/${videos.length}) ---`);
   }
 
   console.log(`\nDone! ${processed} analyzed, ${errors} errors.`);
