@@ -1,6 +1,26 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createServer as createHttpServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "../server";
+
+// Load .env file (tsx doesn't auto-load like Next.js)
+try {
+  const envPath = resolve(import.meta.dirname, "../../../.env");
+  const envContent = readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx);
+    let value = trimmed.slice(eqIdx + 1);
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (!process.env[key]) process.env[key] = value;
+  }
+} catch { /* .env not found, rely on process env */ }
 
 const API_KEY = process.env.MCP_API_KEY;
 const PORT = parseInt(process.env.MCP_PORT || "3100", 10);
