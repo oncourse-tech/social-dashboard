@@ -185,6 +185,7 @@ export async function POST(request: NextRequest) {
                 hook: analysis.hook,
                 script: analysis.script,
                 cta: analysis.cta,
+                relevant: analysis.relevant,
               },
             });
           }

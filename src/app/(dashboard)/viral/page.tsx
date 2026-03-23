@@ -14,7 +14,7 @@ export default async function ViralPage() {
   const threshold2 = settings?.viralThreshold2 ?? 50000;
 
   const videos = await db.video.findMany({
-    where: { views: { gte: threshold1 } },
+    where: { views: { gte: threshold1 }, relevant: true },
     include: {
       account: {
         include: { app: { select: { id: true, name: true, color: true } } },

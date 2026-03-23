@@ -9,6 +9,7 @@ export type VideoAnalysis = {
   hook: string;
   script: string;
   cta: string;
+  relevant: boolean;
 };
 
 interface VideoMetadata {
@@ -28,9 +29,14 @@ const ANALYSIS_PROMPT = `You are an expert TikTok content analyst specializing i
 - Duration: {duration} seconds
 - Sound: {musicName}
 
-## Extract these four things:
+## Extract these five things:
 
-### 1. FORMAT
+### 1. RELEVANT
+Is this video related to medical education, exam preparation (USMLE, MCAT, Step 1/2, board exams), study apps, study tips, medical school life, clinical rotations, residency, or healthcare careers? Answer true or false.
+- **true**: The video is about studying medicine, reviewing study resources, med school experiences, clinical content, exam prep, or healthcare education
+- **false**: The video is lifestyle, fashion, cooking, entertainment, personal vlogs, politics, or other content unrelated to medical education
+
+### 2. FORMAT
 Classify the video into exactly ONE of these content format categories based on what you SEE and HEAR in the video:
 
 - **UGC_REACTION**: A creator reacting to something on screen. This includes duets, stitches, split-screen reactions, or any format where the creator is visibly responding to existing content. The key signal is a reaction to another piece of content.
@@ -38,13 +44,13 @@ Classify the video into exactly ONE of these content format categories based on 
 - **CAROUSEL_SLIDESHOW**: A sequence of static images, text cards, infographic slides, or tip lists. May have transitions between frames. The key signal is that the content is primarily static images or text frames, not live video footage.
 - **OTHER**: Does not clearly fit any of the three categories above.
 
-### 2. HOOK
+### 3. HOOK
 Extract the opening hook — the exact first thing the viewer sees or hears in the first 1-3 seconds that makes them stop scrolling. Write the exact words spoken or shown as text. If the hook is purely visual (no words), describe what the viewer sees in one sentence.
 
-### 3. SCRIPT
+### 4. SCRIPT
 Summarize the full video's script and narrative arc in 2-4 sentences. Capture: what tension, curiosity, or problem is introduced at the start, what insight or payoff is delivered, and how the video concludes. Focus on the storytelling structure, not just the topic.
 
-### 4. CTA
+### 5. CTA
 Extract the call-to-action. This could be:
 - Explicit: exact words like "Follow for more", "Link in bio", "Download the app", "Save this"
 - Implicit: what action the viewer is naturally encouraged to take based on the video's structure (e.g., try the technique, check out the app)
@@ -52,7 +58,7 @@ If there is no CTA at all, write "None".
 
 ## Response format
 Respond with ONLY this JSON. No markdown, no code blocks, no extra text:
-{"format":"<FORMAT>","hook":"<HOOK>","script":"<SCRIPT>","cta":"<CTA>"}`;
+{"relevant":<true|false>,"format":"<FORMAT>","hook":"<HOOK>","script":"<SCRIPT>","cta":"<CTA>"}`;
 
 export async function analyzeVideo(
   video: VideoMetadata
@@ -89,7 +95,7 @@ export async function analyzeVideo(
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return { format: "OTHER" as VideoFormat, hook: "", script: "", cta: "" };
+      return { format: "OTHER" as VideoFormat, hook: "", script: "", cta: "", relevant: true };
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
@@ -99,10 +105,11 @@ export async function analyzeVideo(
       hook: parsed.hook || "",
       script: parsed.script || "",
       cta: parsed.cta || "",
+      relevant: parsed.relevant !== false, // default to true if missing
     };
   } catch (error) {
     console.error("Gemini video analysis failed:", error);
-    return { format: "OTHER" as VideoFormat, hook: "", script: "", cta: "" };
+    return { format: "OTHER" as VideoFormat, hook: "", script: "", cta: "", relevant: true };
   }
 }
 

@@ -114,6 +114,7 @@ model Video {
   hook           String?
   script         String?
   cta            String?
+  relevant       Boolean     @default(true)
   accountId      String
   account   TrackedAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   snapshots VideoSnapshot[]
