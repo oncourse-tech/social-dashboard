@@ -12,7 +12,7 @@ async function main() {
   });
   await server.connect(transport);
 
-  createHttpServer(async (req, res) => {
+  createHttpServer((req, res) => {
     if (API_KEY) {
       const auth = req.headers.authorization;
       if (!auth || auth !== `Bearer ${API_KEY}`) {
@@ -22,7 +22,13 @@ async function main() {
       }
     }
 
-    await transport.handleRequest(req, res);
+    transport.handleRequest(req, res).catch((err) => {
+      console.error("Request error:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Internal server error" }));
+      }
+    });
   }).listen(PORT);
 
   console.error(
