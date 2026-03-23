@@ -34,7 +34,6 @@ const ACCOUNTS: Record<string, string[]> = {
   ],
   "AMBOSS": [
     "curlygirlmed",      // #ambosspartner — official partner
-    "chrisp.md",         // 329K plays rating USMLE resources
     "doctordaanish",     // self-described AMBOSS user since 2020
     "usmletrainings_",   // USMLE coaching, 5 AMBOSS videos
     "carlysnytte",       // AMBOSS Study Plans feature
@@ -49,7 +48,6 @@ const ACCOUNTS: Record<string, string[]> = {
     "omar.baabbad",      // IMG sharing USMLE Step 1 blueprint
     "theorganizedmedic", // 28K plays — appears in UWorld/Lecturio/FA
     "sabineobagi",       // 1.5K likes
-    "imanetarib.md",     // 45.9K plays
     "_layson",           // 1.4K likes
     "lainieem_",         // UWorld + Pathoma mentions
     "brownbeautymd",     // UWorld + Pathoma mentions
@@ -62,37 +60,25 @@ const ACCOUNTS: Record<string, string[]> = {
     "img_to_residency",
     "simplyyynancy",
     "idaleng",
-    "dr.oyenation",
     "awoman.in.stem",
   ],
   "Lecturio": [
     "lecturio_medical_videos", // official account
     "lecturio_nursing",        // official nursing account
-    "mikiraiofficial",         // 277K plays, paid ad
     "usmle.step.12ck3",
     "mariareyna.med",          // 48K plays
     "jose.rivera.m.d",
     "dr.vinti",
-    "roferza.med",             // 23K plays
-    "itsjessamarie",
-    "reginaamoyy",
-    "foukardelen",
     "pavel.pichardo.md",
-    "karenttshernandez",
   ],
   "Osmosis": [
     "learnbyosmosis",          // official account
     "jodietam",                // study with me using Osmosis AI
-    "noteasilybrokan",         // found study method with Osmosis
-    "thedoctorpeach",          // how I use Osmosis for studying
-    "coley013",                // med school study tips + Osmosis
     "latina_rn_in_training",   // nursing student, Osmosis case studies
     "sincerelykimanna",        // Osmosis is underrated
   ],
   "Sketchy": [
     "sketchylearning",         // official Sketchy account
-    "dr.ems",                  // 522K plays, 35K likes
-    "bronteremsik",
     "michaelcogbonna",
     "heyyush",
     "lorieinscrubs",
@@ -105,7 +91,6 @@ const ACCOUNTS: Record<string, string[]> = {
     "drumear3180",
     "doseofscott",
     "usmle.pulse",
-    "chanslifeintiktok",
     "dr.tabathapaulet",
     "lalueur1",
     "generations.md",
@@ -120,22 +105,16 @@ const ACCOUNTS: Record<string, string[]> = {
     "suturinginseattle",
     "kgoswami14",              // also appears in AMBOSS results
     "graham.lail5",
-    "wallabyeee",
     "themedstudentnextdoor",
     "doctor_aqibzaman",
     "docforbabies",
     "medbutnobread",
-    "alehjasso",
   ],
   "Boards & Beyond": [
     "boardsbeyond",            // official account
     "jasonryan356",            // Dr. Jason Ryan, founder
     "brasine",
     "amandaalmostmd",
-    "catiemichi",
-    "kianhabashi",
-    "its.dayank",
-    "nonitrates",
     "bankymedicine",
     "kylaanise__",
     "studentdoclaw",
