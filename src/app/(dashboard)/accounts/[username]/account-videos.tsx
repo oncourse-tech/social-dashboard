@@ -161,7 +161,7 @@ export function AccountVideos({
   videos: AccountVideo[];
   username: string;
 }) {
-  const [view, setView] = useState<"grid" | "list">("list");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [formatFilter, setFormatFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("all");
