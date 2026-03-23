@@ -4,21 +4,6 @@ import { getDatasetItems } from "@/lib/apify";
 // apify-client is marked as serverExternalPackages in next.config.ts
 import { analyzeVideo } from "@/lib/gemini";
 
-const STUDY_KEYWORDS = [
-  "usmle", "step 1", "step 2", "step1", "step2", "mcat", "anki", "amboss",
-  "uworld", "sketchy", "pathoma", "boards and beyond", "first aid", "lecturio",
-  "osmosis", "aistote", "study", "flashcard", "qbank", "med school", "medschool",
-  "pharm", "anatomy", "physiology", "biochem", "micro", "pathology", "pharmacology",
-  "medstudent", "medicalstudent", "doctor", "medicine", "clinical", "residency",
-  "board", "exam", "premed", "nursing", "nurse", "surgery", "surgeon", "hospital",
-  "diagnosis", "symptom", "treatment", "patient",
-];
-
-function isStudyRelated(description: string, hashtags: string[]): boolean {
-  const text = (description + " " + hashtags.join(" ")).toLowerCase();
-  return STUDY_KEYWORDS.some((kw) => text.includes(kw));
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -161,9 +146,6 @@ export async function POST(request: NextRequest) {
             });
             videoRecordId = existing.id;
           } else {
-            // Skip videos not related to study/medical content
-            if (!isStudyRelated(description, hashtags)) continue;
-
             // Create new video
             const created = await db.video.create({
               data: {

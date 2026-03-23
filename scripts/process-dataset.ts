@@ -4,21 +4,6 @@ import "dotenv/config";
 
 const prisma = new PrismaClient();
 
-const STUDY_KEYWORDS = [
-  "usmle", "step 1", "step 2", "step1", "step2", "mcat", "anki", "amboss",
-  "uworld", "sketchy", "pathoma", "boards and beyond", "first aid", "lecturio",
-  "osmosis", "aistote", "study", "flashcard", "qbank", "med school", "medschool",
-  "pharm", "anatomy", "physiology", "biochem", "micro", "pathology", "pharmacology",
-  "medstudent", "medicalstudent", "doctor", "medicine", "clinical", "residency",
-  "board", "exam", "premed", "nursing", "nurse", "surgery", "surgeon", "hospital",
-  "diagnosis", "symptom", "treatment", "patient",
-];
-
-function isStudyRelated(description: string, hashtags: string[]): boolean {
-  const text = (description + " " + hashtags.join(" ")).toLowerCase();
-  return STUDY_KEYWORDS.some((kw) => text.includes(kw));
-}
-
 // Simple format detection without Gemini (to avoid rate limits on 1000+ videos)
 function detectFormat(item: Record<string, any>): VideoFormat {
   const desc = ((item.text ?? "") as string).toLowerCase();
@@ -146,9 +131,6 @@ async function main() {
         });
         videosSynced++;
       } else {
-        // Skip videos not related to study/medical content
-        if (!isStudyRelated(description, hashtags)) continue;
-
         const format = detectFormat(video);
         const created = await prisma.video.create({
           data: {
