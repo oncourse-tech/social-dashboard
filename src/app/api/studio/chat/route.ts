@@ -1,4 +1,8 @@
-import { type UIMessage } from "ai";
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+} from "ai";
 
 export const maxDuration = 300;
 
@@ -26,15 +30,6 @@ function extractText(msg: UIMessage): string {
   );
 }
 
-const HEARTBEAT_INTERVAL = 4000;
-const PROGRESS_PHASES = [
-  "Running tools",
-  "Generating images",
-  "Still generating",
-  "Almost there",
-  "Uploading slides",
-];
-
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
@@ -44,161 +39,97 @@ export async function POST(req: Request) {
     content: extractText(msg),
   }));
 
-  const response = await fetch(
-    `${process.env.OPENCLAW_GATEWAY_URL}/v1/responses`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN}`,
-      },
-      body: JSON.stringify({
-        model: "openclaw",
-        instructions: SYSTEM_PROMPT,
-        input,
-        stream: true,
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    return new Response(text, { status: response.status });
-  }
-
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  const msgId = `msg_${Date.now()}`;
-  const textId = `txt_${Date.now()}`;
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      const reader = response.body!.getReader();
-      let buffer = "";
-      let textStarted = false;
-      let done = false;
-      let heartbeatCount = 0;
-      let lastDataTime = Date.now();
-
-      function ensureTextStarted() {
-        if (!textStarted) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: "text-start", id: textId })}\n\n`
-            )
-          );
-          textStarted = true;
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const response = await fetch(
+        `${process.env.OPENCLAW_GATEWAY_URL}/v1/responses`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN}`,
+          },
+          body: JSON.stringify({
+            model: "openclaw",
+            instructions: SYSTEM_PROMPT,
+            input,
+            stream: true,
+          }),
         }
-      }
-
-      function sendDelta(text: string) {
-        ensureTextStarted();
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ type: "text-delta", id: textId, delta: text })}\n\n`
-          )
-        );
-      }
-
-      // Send custom data event for progress status (not text)
-      function sendProgress(phase: string) {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ type: "data-progress", data: { phase } })}\n\n`
-          )
-        );
-      }
-
-      // Start message
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({ type: "start", messageId: msgId })}\n\n`
-        )
       );
 
-      // Heartbeat: send progress events (not text) when stream is idle
-      const heartbeatTimer = setInterval(() => {
-        if (done) return;
-        const idle = Date.now() - lastDataTime;
-        if (idle > 3000) {
-          const phase =
-            PROGRESS_PHASES[
-              Math.min(heartbeatCount, PROGRESS_PHASES.length - 1)
-            ];
-          sendProgress(phase);
-          heartbeatCount++;
-        }
-      }, HEARTBEAT_INTERVAL);
-
-      try {
-        while (true) {
-          const result = await reader.read();
-          if (result.done) {
-            done = true;
-            break;
-          }
-
-          lastDataTime = Date.now();
-          heartbeatCount = 0;
-
-          // Clear progress when real data arrives
-          sendProgress("");
-
-          buffer += decoder.decode(result.value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const data = line.slice(6).trim();
-            if (data === "[DONE]") continue;
-
-            try {
-              const parsed = JSON.parse(data);
-
-              if (parsed.type === "response.output_text.delta") {
-                sendDelta(parsed.delta);
-              }
-
-              if (parsed.choices?.[0]?.delta?.content) {
-                sendDelta(parsed.choices[0].delta.content);
-              }
-            } catch {
-              // Skip
-            }
-          }
-        }
-
-        clearInterval(heartbeatTimer);
-        sendProgress("");
-
-        if (textStarted) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: "text-end", id: textId })}\n\n`
-            )
-          );
-        }
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ type: "finish", messageId: msgId, finishReason: "stop" })}\n\n`
-          )
-        );
-      } catch (err) {
-        clearInterval(heartbeatTimer);
-        controller.error(err);
-      } finally {
-        controller.close();
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Gateway error (${response.status}): ${text}`);
       }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const textId = `txt_${Date.now()}`;
+      let textStarted = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+
+            // OpenResponses text deltas — real streaming
+            if (parsed.type === "response.output_text.delta" && parsed.delta) {
+              if (!textStarted) {
+                writer.write({ type: "text-start", id: textId });
+                textStarted = true;
+              }
+              writer.write({
+                type: "text-delta",
+                id: textId,
+                delta: parsed.delta,
+              });
+            }
+
+            // Fallback: chat completions format
+            if (parsed.choices?.[0]?.delta?.content) {
+              if (!textStarted) {
+                writer.write({ type: "text-start", id: textId });
+                textStarted = true;
+              }
+              writer.write({
+                type: "text-delta",
+                id: textId,
+                delta: parsed.choices[0].delta.content,
+              });
+            }
+          } catch {
+            // Skip unparseable
+          }
+        }
+      }
+
+      if (textStarted) {
+        writer.write({ type: "text-end", id: textId });
+      }
+    },
+    onError: (error) => {
+      return error instanceof Error ? error.message : String(error);
     },
   });
 
-  return new Response(stream, {
+  return createUIMessageStreamResponse({
+    stream,
     headers: {
-      "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
-      "x-vercel-ai-ui-message-stream": "v1",
     },
   });
 }
