@@ -105,7 +105,7 @@ export function PreviewPanel({
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           {state.slides.map((slide) => (
             <SlideSlot
               key={slide.index}
