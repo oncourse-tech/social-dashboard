@@ -87,7 +87,7 @@ async function analyzeVideo(video: {
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    return { format: "OTHER", hook: "", script: "", cta: "" };
+    return { format: "OTHER", hook: "", script: "", cta: "", relevant: false };
   }
 
   const parsed = JSON.parse(jsonMatch[0]);
