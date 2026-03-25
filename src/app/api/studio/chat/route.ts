@@ -1,35 +1,119 @@
-import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, type UIMessage } from "ai";
-
-const openclaw = createOpenAI({
-  baseURL: process.env.OPENCLAW_GATEWAY_URL + "/v1",
-  apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-});
+import { type UIMessage } from "ai";
 
 export const maxDuration = 120;
 
-function uiMessagesToSimple(
-  messages: UIMessage[]
-): Array<{ role: "user" | "assistant"; content: string }> {
-  return messages.map((msg) => ({
-    role: msg.role as "user" | "assistant",
-    content:
-      msg.parts
-        ?.filter(
-          (p): p is { type: "text"; text: string } => p.type === "text"
-        )
-        .map((p) => p.text)
-        .join("") ?? "",
-  }));
+function extractText(msg: UIMessage): string {
+  return (
+    msg.parts
+      ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("") ?? ""
+  );
 }
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
-  const result = streamText({
-    model: openclaw("openclaw:main"),
-    messages: uiMessagesToSimple(messages),
+  const openaiMessages = messages.map((msg) => ({
+    role: msg.role,
+    content: extractText(msg),
+  }));
+
+  const response = await fetch(
+    `${process.env.OPENCLAW_GATEWAY_URL}/v1/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENCLAW_GATEWAY_TOKEN}`,
+      },
+      body: JSON.stringify({
+        model: "openclaw",
+        messages: openaiMessages,
+        stream: true,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    return new Response(text, { status: response.status });
+  }
+
+  // Convert OpenAI SSE stream → AI SDK v6 UI Message Stream protocol
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const msgId = `msg_${Date.now()}`;
+  const textId = `txt_${Date.now()}`;
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = response.body!.getReader();
+      let buffer = "";
+
+      // Start message
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ type: "start", messageId: msgId })}\n\n`)
+      );
+      // Start text block
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: textId })}\n\n`)
+      );
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: "text-delta", id: textId, delta: content })}\n\n`
+                  )
+                );
+              }
+            } catch {
+              // Skip unparseable chunks
+            }
+          }
+        }
+
+        // End text block
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: textId })}\n\n`)
+        );
+        // Finish message
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "finish", messageId: msgId, finishReason: "stop" })}\n\n`
+          )
+        );
+      } catch (err) {
+        controller.error(err);
+      } finally {
+        controller.close();
+      }
+    },
   });
 
-  return result.toUIMessageStreamResponse();
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "x-vercel-ai-ui-message-stream": "v1",
+    },
+  });
 }
