@@ -3,9 +3,9 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState, useEffect, useRef } from "react";
-import { Send } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowUp, Sparkles, Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Streamdown from "streamdown";
 
 const transport = new DefaultChatTransport({
   api: "/api/studio/chat",
@@ -26,9 +26,10 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const detectedSlugs = useRef<Set<string>>(new Set());
 
-  const isLoading = status === "streaming" || status === "submitted";
+  const isStreaming = status === "streaming";
+  const isSubmitted = status === "submitted";
+  const isLoading = isStreaming || isSubmitted;
 
-  // Expose sendMessage so parent can send messages programmatically
   useEffect(() => {
     if (appendRef) {
       appendRef.current = (text: string) => {
@@ -37,21 +38,16 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
     }
   }, [sendMessage, appendRef]);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, status]);
 
-  // Detect slug from assistant messages
   useEffect(() => {
     for (const msg of messages) {
       if (msg.role !== "assistant") continue;
-      const text = msg.parts
-        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
-        .map((p) => p.text)
-        .join("") ?? "";
+      const text = getMessageText(msg);
       const manifestMatch = text.match(MANIFEST_RE);
       const slug = manifestMatch?.[1] ?? text.match(SLUG_RE)?.[1];
       if (slug && !detectedSlugs.current.has(slug)) {
@@ -68,7 +64,7 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
     setInput("");
   };
 
-  const getMessageText = (msg: typeof messages[number]): string => {
+  const getMessageText = (msg: (typeof messages)[number]): string => {
     return (
       msg.parts
         ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
@@ -78,57 +74,139 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
   };
 
   return (
-    <div className="flex h-full flex-col border-r border-border">
-      <div className="flex h-12 shrink-0 items-center border-b border-border px-4">
-        <h2 className="text-sm font-semibold">Chat</h2>
-      </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              Describe a slideshow concept to get started
-            </p>
-          </div>
-        )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "max-w-[85%] rounded-lg px-3 py-2 text-sm",
-              msg.role === "user"
-                ? "ml-auto bg-primary text-primary-foreground"
-                : "bg-muted"
-            )}
-          >
-            <p className="whitespace-pre-wrap">{getMessageText(msg)}</p>
-          </div>
-        ))}
-        {isLoading && messages[messages.length - 1]?.role === "user" && (
-          <div className="max-w-[85%] rounded-lg bg-muted px-3 py-2">
-            <div className="flex gap-1">
-              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
-              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:0.1s]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:0.2s]" />
+    <div className="flex h-full flex-col">
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-8">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 ring-1 ring-indigo-500/10">
+              <Sparkles className="size-5 text-indigo-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground/80">Slideshow Studio</p>
+              <p className="mt-1 text-xs text-muted-foreground max-w-[280px] leading-relaxed">
+                Describe a concept and the agent will generate 6 photorealistic slides using the tiktok-brain workflow
+              </p>
             </div>
           </div>
+        ) : (
+          <div className="space-y-1 p-3">
+            {messages.map((msg) => {
+              const text = getMessageText(msg);
+              const isUser = msg.role === "user";
+              const isLastAssistant =
+                msg.role === "assistant" &&
+                msg === messages[messages.length - 1];
+
+              return (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex gap-2.5 rounded-xl px-3 py-2.5",
+                    isUser
+                      ? "bg-transparent"
+                      : "bg-muted/40"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md",
+                      isUser
+                        ? "bg-foreground/10"
+                        : "bg-indigo-500/15"
+                    )}
+                  >
+                    {isUser ? (
+                      <User className="size-3.5 text-foreground/60" />
+                    ) : (
+                      <Bot className="size-3.5 text-indigo-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-medium text-muted-foreground mb-1">
+                      {isUser ? "You" : "Agent"}
+                    </p>
+                    <div className="text-[13px] leading-relaxed text-foreground/90 prose prose-sm prose-invert max-w-none prose-p:my-1 prose-pre:bg-white/5 prose-pre:text-xs prose-code:text-indigo-300 prose-headings:text-foreground/90 prose-strong:text-foreground/90 prose-li:my-0.5">
+                      <Streamdown
+                        text={text}
+                        mode={isLastAssistant && isStreaming ? "typewriter" : "normal"}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Waiting for first token */}
+            {isSubmitted && messages[messages.length - 1]?.role === "user" && (
+              <div className="flex gap-2.5 rounded-xl bg-muted/40 px-3 py-2.5">
+                <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/15">
+                  <Bot className="size-3.5 text-indigo-400" />
+                </div>
+                <div className="flex items-center gap-2 py-1">
+                  <div className="flex gap-1">
+                    <span className="size-1.5 rounded-full bg-indigo-400 animate-[bounce_1s_ease-in-out_infinite]" />
+                    <span className="size-1.5 rounded-full bg-indigo-400 animate-[bounce_1s_ease-in-out_infinite_0.15s]" />
+                    <span className="size-1.5 rounded-full bg-indigo-400 animate-[bounce_1s_ease-in-out_infinite_0.3s]" />
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Agent is thinking...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Streaming status bar */}
+            {isStreaming && (
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <div className="h-px flex-1 bg-gradient-to-r from-indigo-500/30 via-indigo-500/10 to-transparent" />
+                <span className="flex items-center gap-1.5 text-[10px] font-medium text-indigo-400/70">
+                  <span className="relative flex size-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-50" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-indigo-400" />
+                  </span>
+                  streaming
+                </span>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex shrink-0 items-center gap-2 border-t border-border p-3"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Describe your slideshow concept..."
-          className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        />
-        <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
-          <Send className="size-4" />
-        </Button>
-      </form>
+      {/* Input */}
+      <div className="shrink-0 border-t border-border/50 p-3">
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-end gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 transition-colors focus-within:border-indigo-500/40 focus-within:bg-muted/50"
+        >
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            placeholder="Describe your slideshow concept..."
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none"
+            style={{ maxHeight: 120, minHeight: 20 }}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className={cn(
+              "flex size-7 shrink-0 items-center justify-center rounded-lg transition-all",
+              input.trim() && !isLoading
+                ? "bg-indigo-500 text-white hover:bg-indigo-600 shadow-sm shadow-indigo-500/25"
+                : "bg-foreground/5 text-muted-foreground cursor-not-allowed"
+            )}
+          >
+            <ArrowUp className="size-3.5" strokeWidth={2.5} />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

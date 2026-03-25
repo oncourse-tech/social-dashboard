@@ -26,7 +26,9 @@ export default function SlideshowStudioPage() {
   );
 
   const handleRegenerate = useCallback(() => {
-    sendChatMessage("Regenerate all 6 slides for the current slideshow with the same concept and scene.");
+    sendChatMessage(
+      "Regenerate all 6 slides for the current slideshow with the same concept and scene."
+    );
     slideState.reset();
   }, [sendChatMessage, slideState.reset]);
 
@@ -72,16 +74,20 @@ export default function SlideshowStudioPage() {
   }, [slideState.slides, slideState.slug]);
 
   const currentTexts =
-    (slideState.manifest as { texts?: string[] })?.texts ??
-    Array(6).fill("");
+    (slideState.manifest as { texts?: string[] })?.texts ?? Array(6).fill("");
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] md:h-screen">
-      <div className="w-1/2 min-w-[320px]">
-        <ChatPanel onSlugDetected={handleSlugDetected} appendRef={appendRef} />
+    <div className="-m-4 md:-m-6 flex h-[calc(100vh-3.5rem)] md:h-screen">
+      {/* Chat — left panel */}
+      <div className="w-[55%] min-w-[360px] border-r border-border/50">
+        <ChatPanel
+          onSlugDetected={handleSlugDetected}
+          appendRef={appendRef}
+        />
       </div>
 
-      <div className="w-1/2 min-w-[320px]">
+      {/* Preview — right panel */}
+      <div className="w-[45%] min-w-[300px]">
         <PreviewPanel
           state={slideState}
           onSlideClick={setLightboxIndex}
@@ -91,6 +97,7 @@ export default function SlideshowStudioPage() {
         />
       </div>
 
+      {/* Lightbox */}
       <SlideLightbox
         slides={slideState.slides}
         activeIndex={lightboxIndex}
@@ -98,6 +105,7 @@ export default function SlideshowStudioPage() {
         onNavigate={setLightboxIndex}
       />
 
+      {/* Edit texts */}
       <EditTextsDialog
         open={editTextsOpen}
         onOpenChange={setEditTextsOpen}
