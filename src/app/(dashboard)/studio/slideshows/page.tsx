@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { MessageSquare, Grid2x2 } from "lucide-react";
 import { ChatPanel, type SlideUrlData } from "@/components/studio/chat-panel";
 import { PreviewPanel } from "@/components/studio/preview-panel";
 import { SlideLightbox } from "@/components/studio/slide-lightbox";
 import { EditTextsDialog } from "@/components/studio/edit-texts-dialog";
 import { FeedbackDialog } from "@/components/studio/feedback-dialog";
 import { useSlidePolling } from "@/components/studio/use-slide-polling";
+import { cn } from "@/lib/utils";
 import JSZip from "jszip";
 
 export default function SlideshowStudioPage() {
@@ -14,6 +16,7 @@ export default function SlideshowStudioPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [editTextsOpen, setEditTextsOpen] = useState(false);
   const [regenOpen, setRegenOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"chat" | "preview">("chat");
   const appendRef = useRef<((message: string) => void) | null>(null);
 
   const sendChatMessage = useCallback((text: string) => {
@@ -29,7 +32,6 @@ export default function SlideshowStudioPage() {
 
   const handleSlideUrlsDetected = useCallback(
     (data: SlideUrlData) => {
-      // Add cache-busting timestamp to URLs
       const busted = {
         ...data,
         slides: data.slides.map((s) => ({
@@ -38,6 +40,8 @@ export default function SlideshowStudioPage() {
         })),
       };
       slideState.setSlidesFromUrls(busted);
+      // Auto-switch to preview on mobile when slides arrive
+      setMobileTab("preview");
     },
     [slideState.setSlidesFromUrls]
   );
@@ -50,6 +54,7 @@ export default function SlideshowStudioPage() {
         : "Regenerate all 6 slides for the current slideshow with fresh images.";
       sendChatMessage(msg);
       slideState.reset();
+      setMobileTab("chat");
     },
     [sendChatMessage, slideState.reset]
   );
@@ -67,6 +72,7 @@ export default function SlideshowStudioPage() {
         `Regenerate the slideshow with these updated texts:\n${textsFormatted}${feedbackPart}`
       );
       slideState.reset();
+      setMobileTab("chat");
     },
     [sendChatMessage, slideState.reset]
   );
@@ -101,9 +107,23 @@ export default function SlideshowStudioPage() {
   const currentTexts =
     (slideState.manifest as { texts?: string[] })?.texts ?? Array(6).fill("");
 
+  const readyCount = slideState.slides.filter(
+    (s) => s.status === "ready"
+  ).length;
+
   return (
-    <div className="-m-4 md:-m-6 flex h-[calc(100vh-3.5rem)] md:h-screen">
-      <div className="w-[55%] min-w-[360px] border-r border-border/50">
+    <div className="-m-4 md:-m-6 flex flex-col md:flex-row h-[calc(100vh-3.5rem)] md:h-screen">
+      {/* Desktop: side-by-side */}
+      {/* Mobile: tabbed view */}
+
+      {/* Chat panel */}
+      <div
+        className={cn(
+          "md:w-[55%] md:min-w-[360px] md:border-r md:border-border/50",
+          "flex-1 md:flex-none",
+          mobileTab === "chat" ? "flex flex-col" : "hidden md:flex md:flex-col"
+        )}
+      >
         <ChatPanel
           onSlugDetected={handleSlugDetected}
           onSlideUrlsDetected={handleSlideUrlsDetected}
@@ -111,7 +131,16 @@ export default function SlideshowStudioPage() {
         />
       </div>
 
-      <div className="w-[45%] min-w-[300px]">
+      {/* Preview panel */}
+      <div
+        className={cn(
+          "md:w-[45%] md:min-w-[300px]",
+          "flex-1 md:flex-none",
+          mobileTab === "preview"
+            ? "flex flex-col"
+            : "hidden md:flex md:flex-col"
+        )}
+      >
         <PreviewPanel
           state={slideState}
           onSlideClick={setLightboxIndex}
@@ -121,6 +150,40 @@ export default function SlideshowStudioPage() {
         />
       </div>
 
+      {/* Mobile tab bar */}
+      <div className="md:hidden shrink-0 flex border-t border-border/50 bg-background">
+        <button
+          onClick={() => setMobileTab("chat")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-colors",
+            mobileTab === "chat"
+              ? "text-indigo-400 border-t-2 border-indigo-400 -mt-px"
+              : "text-muted-foreground"
+          )}
+        >
+          <MessageSquare className="size-4" />
+          Chat
+        </button>
+        <button
+          onClick={() => setMobileTab("preview")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-colors relative",
+            mobileTab === "preview"
+              ? "text-indigo-400 border-t-2 border-indigo-400 -mt-px"
+              : "text-muted-foreground"
+          )}
+        >
+          <Grid2x2 className="size-4" />
+          Preview
+          {readyCount > 0 && (
+            <span className="absolute top-2 right-[calc(50%-28px)] size-4 flex items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white">
+              {readyCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Modals */}
       <SlideLightbox
         slides={slideState.slides}
         activeIndex={lightboxIndex}

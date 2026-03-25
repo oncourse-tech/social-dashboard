@@ -105,7 +105,7 @@ export function PreviewPanel({
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {state.slides.map((slide) => (
             <SlideSlot
               key={slide.index}
@@ -123,7 +123,7 @@ export function PreviewPanel({
       </div>
 
       {/* Action buttons */}
-      <div className="flex shrink-0 gap-2 border-t border-border/50 p-3">
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-border/50 p-3">
         <Button
           variant="outline"
           size="sm"
