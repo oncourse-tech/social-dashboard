@@ -26,17 +26,24 @@ function extractText(msg: UIMessage): string {
   );
 }
 
+const HEARTBEAT_INTERVAL = 5000; // 5 seconds
+const PROGRESS_MESSAGES = [
+  "\n\n> ⏳ Running tools...",
+  "\n> 🎨 Generating images...",
+  "\n> 🎨 Still generating...",
+  "\n> 🎨 Almost there...",
+  "\n> 📤 Processing...",
+];
+
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
-  // Build input for OpenResponses API
   const input = messages.map((msg) => ({
     type: "message" as const,
     role: msg.role,
     content: extractText(msg),
   }));
 
-  // Use OpenResponses API for proper word-by-word streaming
   const response = await fetch(
     `${process.env.OPENCLAW_GATEWAY_URL}/v1/responses`,
     {
@@ -59,7 +66,6 @@ export async function POST(req: Request) {
     return new Response(text, { status: response.status });
   }
 
-  // Convert OpenResponses SSE → AI SDK v6 UI Message Stream protocol
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const msgId = `msg_${Date.now()}`;
@@ -70,6 +76,28 @@ export async function POST(req: Request) {
       const reader = response.body!.getReader();
       let buffer = "";
       let textStarted = false;
+      let done = false;
+      let heartbeatCount = 0;
+
+      function ensureTextStarted() {
+        if (!textStarted) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "text-start", id: textId })}\n\n`
+            )
+          );
+          textStarted = true;
+        }
+      }
+
+      function sendDelta(text: string) {
+        ensureTextStarted();
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "text-delta", id: textId, delta: text })}\n\n`
+          )
+        );
+      }
 
       // Start message
       controller.enqueue(
@@ -78,12 +106,26 @@ export async function POST(req: Request) {
         )
       );
 
+      // Heartbeat: send progress messages when stream is idle
+      const heartbeatTimer = setInterval(() => {
+        if (done) return;
+        const msg = PROGRESS_MESSAGES[Math.min(heartbeatCount, PROGRESS_MESSAGES.length - 1)];
+        sendDelta(msg);
+        heartbeatCount++;
+      }, HEARTBEAT_INTERVAL);
+
       try {
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const result = await reader.read();
+          if (result.done) {
+            done = true;
+            break;
+          }
 
-          buffer += decoder.decode(value, { stream: true });
+          // Reset heartbeat counter on real data
+          heartbeatCount = 0;
+
+          buffer += decoder.decode(result.value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
 
@@ -95,38 +137,14 @@ export async function POST(req: Request) {
             try {
               const parsed = JSON.parse(data);
 
-              // Text streaming deltas
+              // OpenResponses text deltas
               if (parsed.type === "response.output_text.delta") {
-                if (!textStarted) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({ type: "text-start", id: textId })}\n\n`
-                    )
-                  );
-                  textStarted = true;
-                }
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({ type: "text-delta", id: textId, delta: parsed.delta })}\n\n`
-                  )
-                );
+                sendDelta(parsed.delta);
               }
 
-              // Fallback: chat completions format (if gateway sends that)
+              // Fallback: chat completions format
               if (parsed.choices?.[0]?.delta?.content) {
-                if (!textStarted) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({ type: "text-start", id: textId })}\n\n`
-                    )
-                  );
-                  textStarted = true;
-                }
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({ type: "text-delta", id: textId, delta: parsed.choices[0].delta.content })}\n\n`
-                  )
-                );
+                sendDelta(parsed.choices[0].delta.content);
               }
             } catch {
               // Skip unparseable
@@ -134,7 +152,9 @@ export async function POST(req: Request) {
           }
         }
 
-        // End text + finish
+        // Cleanup
+        clearInterval(heartbeatTimer);
+
         if (textStarted) {
           controller.enqueue(
             encoder.encode(
@@ -148,6 +168,7 @@ export async function POST(req: Request) {
           )
         );
       } catch (err) {
+        clearInterval(heartbeatTimer);
         controller.error(err);
       } finally {
         controller.close();
