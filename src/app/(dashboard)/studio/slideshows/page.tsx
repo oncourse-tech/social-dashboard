@@ -120,7 +120,7 @@ export default function SlideshowStudioPage() {
       <div
         className={cn(
           "md:w-[55%] md:min-w-[360px] md:border-r md:border-border/50",
-          "flex-1 md:flex-none",
+          "flex-1 min-h-0 md:flex-none",
           mobileTab === "chat" ? "flex flex-col" : "hidden md:flex md:flex-col"
         )}
       >
@@ -135,7 +135,7 @@ export default function SlideshowStudioPage() {
       <div
         className={cn(
           "md:w-[45%] md:min-w-[300px]",
-          "flex-1 md:flex-none",
+          "flex-1 min-h-0 md:flex-none",
           mobileTab === "preview"
             ? "flex flex-col"
             : "hidden md:flex md:flex-col"
