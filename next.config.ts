@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["apify-client"],
+  serverExternalPackages: ["apify-client", "ssh2", "cpu-features"],
   images: {
     remotePatterns: [
       {
