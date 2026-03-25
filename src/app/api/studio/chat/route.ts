@@ -58,6 +58,9 @@ export async function POST(req: Request) {
         }
       );
 
+      // Send start event so useChat creates the assistant message
+      writer.write({ type: "start" });
+
       if (!response.ok) {
         const text = await response.text();
         throw new Error(`Gateway error (${response.status}): ${text}`);
@@ -119,6 +122,7 @@ export async function POST(req: Request) {
       if (textStarted) {
         writer.write({ type: "text-end", id: textId });
       }
+      writer.write({ type: "finish", finishReason: "stop" });
     },
     onError: (error) => {
       return error instanceof Error ? error.message : String(error);
