@@ -127,32 +127,27 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
                     <p className="text-[11px] font-medium text-muted-foreground mb-1">
                       {isUser ? "You" : "Agent"}
                     </p>
-                    <div className="text-[13px] leading-relaxed text-foreground/90 streamdown-wrapper">
-                      <Streamdown
-                        mode={isLastAssistant && isStreaming ? "typewriter" : "normal"}
-                      >
-                        {text}
-                      </Streamdown>
-                    </div>
+                    {!isUser && isLastAssistant && isLoading && !text ? (
+                      <div className="flex items-center gap-2 py-0.5">
+                        <Loader2 className="size-3.5 animate-spin text-indigo-400" />
+                        <span className="text-xs text-muted-foreground">
+                          Agent is working...
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-[13px] leading-relaxed text-foreground/90 streamdown-wrapper">
+                        <Streamdown
+                          mode={isLastAssistant && isStreaming ? "typewriter" : "normal"}
+                        >
+                          {text}
+                        </Streamdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
 
-            {/* Loading — waiting for agent response */}
-            {isLoading && messages[messages.length - 1]?.role === "user" && (
-              <div className="flex gap-2.5 rounded-xl bg-muted/40 px-3 py-2.5">
-                <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/15">
-                  <Bot className="size-3.5 text-indigo-400" />
-                </div>
-                <div className="flex items-center gap-2 py-1">
-                  <Loader2 className="size-3.5 animate-spin text-indigo-400" />
-                  <span className="text-xs text-muted-foreground">
-                    Agent is working...
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
