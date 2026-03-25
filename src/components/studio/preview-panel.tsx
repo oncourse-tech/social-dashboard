@@ -138,7 +138,7 @@ export function PreviewPanel({
           variant="outline"
           size="sm"
           onClick={onEditTexts}
-          disabled={!state.manifest}
+          disabled={!hasAnySlide}
           className="h-8 gap-1.5 text-xs border-border/60 hover:bg-muted/50"
         >
           <Pencil className="size-3" />

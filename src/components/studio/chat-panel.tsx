@@ -25,7 +25,10 @@ interface ChatPanelProps {
 
 const MANIFEST_RE = /MANIFEST:.*\/posts\/photo\/([^/]+)\/manifest\.json/;
 const SLUG_RE = /(?:generating|rendering).*?(?:slug|concept)[:\s]+["']?([a-z0-9-]+)/i;
-const SLIDE_URLS_RE = /```SLIDE_URLS\s*\n([\s\S]*?)```/;
+// Match SLIDE_URLS code block (with or without language tag)
+const SLIDE_URLS_RE = /```(?:SLIDE_URLS|json)?\s*\n?([\s\S]*?\{[\s\S]*?"slides"[\s\S]*?\})\s*```/;
+// Fallback: find raw JSON with slug + slides array
+const SLIDE_JSON_RE = /\{[^{}]*"slug"\s*:\s*"[^"]+"\s*,\s*"slides"\s*:\s*\[[\s\S]*?\]\s*\}/;
 
 export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: ChatPanelProps) {
   const { messages, sendMessage, status } = useChat({ transport });
@@ -99,11 +102,13 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
       if (msg.role !== "assistant") continue;
       const text = getMessageText(msg);
 
-      const slideUrlsMatch = text.match(SLIDE_URLS_RE);
+      // Try code block first, then raw JSON fallback
+      const slideUrlsMatch = text.match(SLIDE_URLS_RE) || text.match(SLIDE_JSON_RE);
       if (slideUrlsMatch) {
+        const jsonStr = slideUrlsMatch[1] || slideUrlsMatch[0];
         try {
-          const data = JSON.parse(slideUrlsMatch[1]) as SlideUrlData;
-          if (data.slug && !detectedSlugs.current.has("urls:" + data.slug)) {
+          const data = JSON.parse(jsonStr) as SlideUrlData;
+          if (data.slug && data.slides && !detectedSlugs.current.has("urls:" + data.slug)) {
             detectedSlugs.current.add("urls:" + data.slug);
             onSlideUrlsDetected?.(data);
           }
