@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState, useEffect, useRef } from "react";
-import { ArrowUp, Sparkles, Bot, User } from "lucide-react";
+import { ArrowUp, Sparkles, Bot, User, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
@@ -139,36 +139,18 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
               );
             })}
 
-            {/* Waiting for first token */}
-            {isSubmitted && messages[messages.length - 1]?.role === "user" && (
+            {/* Loading — waiting for agent response */}
+            {isLoading && messages[messages.length - 1]?.role === "user" && (
               <div className="flex gap-2.5 rounded-xl bg-muted/40 px-3 py-2.5">
                 <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-indigo-500/15">
                   <Bot className="size-3.5 text-indigo-400" />
                 </div>
                 <div className="flex items-center gap-2 py-1">
-                  <div className="flex gap-1">
-                    <span className="size-1.5 rounded-full bg-indigo-400 animate-[bounce_1s_ease-in-out_infinite]" />
-                    <span className="size-1.5 rounded-full bg-indigo-400 animate-[bounce_1s_ease-in-out_infinite_0.15s]" />
-                    <span className="size-1.5 rounded-full bg-indigo-400 animate-[bounce_1s_ease-in-out_infinite_0.3s]" />
-                  </div>
+                  <Loader2 className="size-3.5 animate-spin text-indigo-400" />
                   <span className="text-xs text-muted-foreground">
-                    Agent is thinking...
+                    Agent is working...
                   </span>
                 </div>
-              </div>
-            )}
-
-            {/* Streaming status bar */}
-            {isStreaming && (
-              <div className="flex items-center gap-2 px-3 py-1.5">
-                <div className="h-px flex-1 bg-gradient-to-r from-indigo-500/30 via-indigo-500/10 to-transparent" />
-                <span className="flex items-center gap-1.5 text-[10px] font-medium text-indigo-400/70">
-                  <span className="relative flex size-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-50" />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-indigo-400" />
-                  </span>
-                  streaming
-                </span>
               </div>
             )}
           </div>
