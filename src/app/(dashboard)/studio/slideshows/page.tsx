@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { ChatPanel } from "@/components/studio/chat-panel";
+import { ChatPanel, type SlideUrlData } from "@/components/studio/chat-panel";
 import { PreviewPanel } from "@/components/studio/preview-panel";
 import { SlideLightbox } from "@/components/studio/slide-lightbox";
 import { EditTextsDialog } from "@/components/studio/edit-texts-dialog";
@@ -23,6 +23,13 @@ export default function SlideshowStudioPage() {
       slideState.startPolling(slug);
     },
     [slideState.startPolling]
+  );
+
+  const handleSlideUrlsDetected = useCallback(
+    (data: SlideUrlData) => {
+      slideState.setSlidesFromUrls(data);
+    },
+    [slideState.setSlidesFromUrls]
   );
 
   const handleRegenerate = useCallback(() => {
@@ -82,6 +89,7 @@ export default function SlideshowStudioPage() {
       <div className="w-[55%] min-w-[360px] border-r border-border/50">
         <ChatPanel
           onSlugDetected={handleSlugDetected}
+          onSlideUrlsDetected={handleSlideUrlsDetected}
           appendRef={appendRef}
         />
       </div>

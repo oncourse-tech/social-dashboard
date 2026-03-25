@@ -1,9 +1,23 @@
 import { Client } from "ssh2";
+import { readFileSync } from "fs";
+
+function getPrivateKey(): Buffer | string {
+  // In production (Vercel): use base64-encoded env var
+  // Locally: read from SSH_KEY_PATH or default ~/.ssh/id_ed25519
+  if (process.env.OPENCLAW_SSH_KEY_PATH) {
+    return readFileSync(process.env.OPENCLAW_SSH_KEY_PATH);
+  }
+  if (process.env.OPENCLAW_SSH_PRIVATE_KEY) {
+    return Buffer.from(process.env.OPENCLAW_SSH_PRIVATE_KEY, "base64");
+  }
+  // Fallback: local dev default
+  return readFileSync(`${process.env.HOME}/.ssh/id_ed25519`);
+}
 
 const SSH_CONFIG = {
   host: process.env.OPENCLAW_SSH_HOST!,
   username: process.env.OPENCLAW_SSH_USER!,
-  privateKey: Buffer.from(process.env.OPENCLAW_SSH_PRIVATE_KEY!, "base64"),
+  privateKey: getPrivateKey(),
 };
 
 export async function sshExec(command: string): Promise<string> {

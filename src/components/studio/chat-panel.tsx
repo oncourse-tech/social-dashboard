@@ -12,15 +12,22 @@ const transport = new DefaultChatTransport({
   api: "/api/studio/chat",
 });
 
+export interface SlideUrlData {
+  slug: string;
+  slides: Array<{ index: number; url: string | null; status: string }>;
+}
+
 interface ChatPanelProps {
   onSlugDetected: (slug: string) => void;
+  onSlideUrlsDetected?: (data: SlideUrlData) => void;
   appendRef?: React.MutableRefObject<((message: string) => void) | null>;
 }
 
 const MANIFEST_RE = /MANIFEST:.*\/posts\/photo\/([^/]+)\/manifest\.json/;
 const SLUG_RE = /(?:generating|rendering).*?(?:slug|concept)[:\s]+["']?([a-z0-9-]+)/i;
+const SLIDE_URLS_RE = /```SLIDE_URLS\s*\n([\s\S]*?)```/;
 
-export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
+export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: ChatPanelProps) {
   const { messages, sendMessage, status } = useChat({ transport });
 
   const [input, setInput] = useState("");
@@ -49,6 +56,20 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
     for (const msg of messages) {
       if (msg.role !== "assistant") continue;
       const text = getMessageText(msg);
+
+      // Detect SLIDE_URLS JSON block (from upload script output)
+      const slideUrlsMatch = text.match(SLIDE_URLS_RE);
+      if (slideUrlsMatch) {
+        try {
+          const data = JSON.parse(slideUrlsMatch[1]) as SlideUrlData;
+          if (data.slug && !detectedSlugs.current.has("urls:" + data.slug)) {
+            detectedSlugs.current.add("urls:" + data.slug);
+            onSlideUrlsDetected?.(data);
+          }
+        } catch { /* ignore parse errors */ }
+      }
+
+      // Fallback: detect slug from MANIFEST: pattern
       const manifestMatch = text.match(MANIFEST_RE);
       const slug = manifestMatch?.[1] ?? text.match(SLUG_RE)?.[1];
       if (slug && !detectedSlugs.current.has(slug)) {
@@ -56,7 +77,7 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
         onSlugDetected(slug);
       }
     }
-  }, [messages, onSlugDetected]);
+  }, [messages, onSlugDetected, onSlideUrlsDetected]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -24,8 +24,13 @@ Follow the production-slides workflow from the tiktok-brain skill:
 2. Run generate-photo-slides.js at ~/clawd-oncourse/tiktok-marketing/scripts/generate-photo-slides.js
 3. Use flags: --concept, --texts, --scene, --account @oncourse.usmle, --cta
 
-After generation completes, output:
-MANIFEST:~/clawd-oncourse/tiktok-marketing/posts/photo/{slug}/manifest.json`,
+After generate-photo-slides.js completes, ALWAYS run the upload script:
+  node ~/clawd-oncourse/tiktok-marketing/scripts/upload-slides-to-supabase.js --manifest ~/clawd-oncourse/tiktok-marketing/posts/photo/{slug}/manifest.json
+
+The upload script outputs JSON with Supabase CDN URLs for each slide. Include the full JSON output in your response so the UI can display the slides. Format it as a code block tagged SLIDE_URLS:
+\`\`\`SLIDE_URLS
+{the JSON output from the upload script}
+\`\`\``,
     },
     ...messages.map((msg) => ({
       role: msg.role,

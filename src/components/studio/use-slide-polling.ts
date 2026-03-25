@@ -90,7 +90,26 @@ export function useSlidePolling() {
     setState({ slug: null, status: "idle", slides: EMPTY_SLIDES, manifest: null, error: null });
   }, [stopPolling]);
 
+  // Set slides directly from URLs (no polling needed)
+  const setSlidesFromUrls = useCallback(
+    (data: { slug: string; slides: Array<{ index: number; url: string | null; status: string }> }) => {
+      stopPolling();
+      setState({
+        slug: data.slug,
+        status: data.slides.every((s) => s.status === "ready") ? "complete" : "generating",
+        slides: data.slides.map((s) => ({
+          index: s.index,
+          url: s.url,
+          status: s.status as SlideStatus,
+        })),
+        manifest: null,
+        error: null,
+      });
+    },
+    [stopPolling]
+  );
+
   useEffect(() => stopPolling, [stopPolling]);
 
-  return { ...state, startPolling, stopPolling, reset };
+  return { ...state, startPolling, stopPolling, reset, setSlidesFromUrls };
 }
