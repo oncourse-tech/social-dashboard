@@ -5,6 +5,7 @@ import { ChatPanel, type SlideUrlData } from "@/components/studio/chat-panel";
 import { PreviewPanel } from "@/components/studio/preview-panel";
 import { SlideLightbox } from "@/components/studio/slide-lightbox";
 import { EditTextsDialog } from "@/components/studio/edit-texts-dialog";
+import { FeedbackDialog } from "@/components/studio/feedback-dialog";
 import { useSlidePolling } from "@/components/studio/use-slide-polling";
 import JSZip from "jszip";
 
@@ -12,6 +13,7 @@ export default function SlideshowStudioPage() {
   const slideState = useSlidePolling();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [editTextsOpen, setEditTextsOpen] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
   const appendRef = useRef<((message: string) => void) | null>(null);
 
   const sendChatMessage = useCallback((text: string) => {
@@ -27,26 +29,42 @@ export default function SlideshowStudioPage() {
 
   const handleSlideUrlsDetected = useCallback(
     (data: SlideUrlData) => {
-      slideState.setSlidesFromUrls(data);
+      // Add cache-busting timestamp to URLs
+      const busted = {
+        ...data,
+        slides: data.slides.map((s) => ({
+          ...s,
+          url: s.url ? `${s.url}?t=${Date.now()}` : null,
+        })),
+      };
+      slideState.setSlidesFromUrls(busted);
     },
     [slideState.setSlidesFromUrls]
   );
 
-  const handleRegenerate = useCallback(() => {
-    sendChatMessage(
-      "Regenerate all 6 slides for the current slideshow with the same concept and scene."
-    );
-    slideState.reset();
-  }, [sendChatMessage, slideState.reset]);
+  const handleRegenerate = useCallback(
+    (feedback: string) => {
+      setRegenOpen(false);
+      const msg = feedback.trim()
+        ? `Regenerate the slideshow with this feedback: ${feedback}`
+        : "Regenerate all 6 slides for the current slideshow with fresh images.";
+      sendChatMessage(msg);
+      slideState.reset();
+    },
+    [sendChatMessage, slideState.reset]
+  );
 
   const handleEditTextsSubmit = useCallback(
-    (texts: string[]) => {
+    (texts: string[], feedback: string) => {
       setEditTextsOpen(false);
       const textsFormatted = texts
         .map((t, i) => `Slide ${i + 1}: "${t}"`)
         .join("\n");
+      const feedbackPart = feedback.trim()
+        ? `\n\nAdditional feedback: ${feedback}`
+        : "";
       sendChatMessage(
-        `Regenerate the slideshow with these updated texts:\n${textsFormatted}`
+        `Regenerate the slideshow with these updated texts:\n${textsFormatted}${feedbackPart}`
       );
       slideState.reset();
     },
@@ -85,7 +103,6 @@ export default function SlideshowStudioPage() {
 
   return (
     <div className="-m-4 md:-m-6 flex h-[calc(100vh-3.5rem)] md:h-screen">
-      {/* Chat — left panel */}
       <div className="w-[55%] min-w-[360px] border-r border-border/50">
         <ChatPanel
           onSlugDetected={handleSlugDetected}
@@ -94,18 +111,16 @@ export default function SlideshowStudioPage() {
         />
       </div>
 
-      {/* Preview — right panel */}
       <div className="w-[45%] min-w-[300px]">
         <PreviewPanel
           state={slideState}
           onSlideClick={setLightboxIndex}
-          onRegenerate={handleRegenerate}
+          onRegenerate={() => setRegenOpen(true)}
           onEditTexts={() => setEditTextsOpen(true)}
           onDownload={handleDownload}
         />
       </div>
 
-      {/* Lightbox */}
       <SlideLightbox
         slides={slideState.slides}
         activeIndex={lightboxIndex}
@@ -113,7 +128,15 @@ export default function SlideshowStudioPage() {
         onNavigate={setLightboxIndex}
       />
 
-      {/* Edit texts */}
+      <FeedbackDialog
+        open={regenOpen}
+        onOpenChange={setRegenOpen}
+        title="Regenerate Slideshow"
+        description="Optionally describe what to change. Leave empty to regenerate with the same concept."
+        submitLabel="Regenerate"
+        onSubmit={handleRegenerate}
+      />
+
       <EditTextsDialog
         open={editTextsOpen}
         onOpenChange={setEditTextsOpen}
