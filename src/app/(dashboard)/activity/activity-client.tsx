@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -106,9 +106,8 @@ export function ActivityClient({
 
           {/* Data rows */}
           {DAYS.map((day, dayIdx) => (
-            <>
+            <Fragment key={`d-${dayIdx}`}>
               <div
-                key={`d-${dayIdx}`}
                 className="flex items-center pr-2 text-xs text-muted-foreground"
               >
                 {day}
@@ -127,7 +126,7 @@ export function ActivityClient({
                   />
                 );
               })}
-            </>
+            </Fragment>
           ))}
         </div>
       </div>

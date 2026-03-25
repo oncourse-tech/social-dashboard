@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Eye, Heart, Search, Filter } from "lucide-react";
+import {
+  ExternalLink,
+  Eye,
+  Heart,
+  Search,
+  Filter,
+} from "lucide-react";
 import { VideoGrid, type VideoCardData } from "@/components/video-grid";
 import { DataTable } from "@/components/data-table";
 import { ViewToggle } from "@/components/view-toggle";
@@ -27,6 +33,7 @@ import {
 } from "@/lib/utils";
 import { FORMAT_LABELS } from "@/lib/constants";
 import { type VideoFormat } from "@prisma/client";
+import { usePathname, useRouter } from "next/navigation";
 
 type AllVideo = VideoCardData & {
   hook: string | null;
@@ -34,6 +41,13 @@ type AllVideo = VideoCardData & {
   cta: string | null;
   account: { username: string };
   app: { id: string; name: string; color: string };
+};
+
+type Filters = {
+  search: string;
+  app: string;
+  format: string;
+  minViews: string;
 };
 
 const columns: ColumnDef<AllVideo, unknown>[] = [
@@ -175,68 +189,81 @@ const columns: ColumnDef<AllVideo, unknown>[] = [
   },
 ];
 
-const PAGE_SIZE = 50;
+function updateQuery(
+  router: ReturnType<typeof useRouter>,
+  pathname: string,
+  next: Partial<Filters> & { page?: number }
+) {
+  const params = new URLSearchParams(window.location.search);
+
+  const set = (key: string, value: string | undefined) => {
+    const trimmed = value?.trim() ?? "";
+    if (!trimmed || trimmed === "all") params.delete(key);
+    else params.set(key, trimmed);
+  };
+
+  if (next.search !== undefined) set("search", next.search);
+  if (next.app !== undefined) set("app", next.app);
+  if (next.format !== undefined) set("format", next.format);
+  if (next.minViews !== undefined) set("minViews", next.minViews);
+
+  if (next.page && next.page > 1) params.set("page", String(next.page));
+  else params.delete("page");
+
+  const query = params.toString();
+  router.replace(query ? `${pathname}?${query}` : pathname);
+}
 
 export function VideosClient({
   videos,
   apps,
   totalCount,
+  page,
+  pageSize,
+  filters,
 }: {
   videos: AllVideo[];
   apps: { id: string; name: string; color: string }[];
   totalCount: number;
+  page: number;
+  pageSize: number;
+  filters: Filters;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [view, setView] = useState<"grid" | "list">("list");
-  const [search, setSearch] = useState("");
-  const [appFilter, setAppFilter] = useState("all");
-  const [formatFilter, setFormatFilter] = useState("all");
-  const [minViews, setMinViews] = useState("");
-  const [page, setPage] = useState(0);
+  const searchTimeout = useRef<number | null>(null);
 
-  const filtered = useMemo(() => {
-    let result = videos;
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (v) =>
-          v.description.toLowerCase().includes(q) ||
-          v.hashtags.some((h) => h.toLowerCase().includes(q)) ||
-          (v.hook && v.hook.toLowerCase().includes(q))
-      );
-    }
-    if (appFilter !== "all") {
-      result = result.filter((v) => v.app.id === appFilter);
-    }
-    if (formatFilter !== "all") {
-      result = result.filter((v) => v.format === formatFilter);
-    }
-    if (minViews) {
-      const min = parseInt(minViews, 10);
-      if (!isNaN(min)) {
-        result = result.filter((v) => v.views >= min);
+  useEffect(() => {
+    return () => {
+      if (searchTimeout.current !== null) {
+        window.clearTimeout(searchTimeout.current);
       }
-    }
-    return result;
-  }, [videos, search, appFilter, formatFilter, minViews]);
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    };
+  }, []);
 
   const formatOptions = Object.entries(FORMAT_LABELS) as [
     VideoFormat,
     string,
   ][];
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
     <div className="flex flex-col gap-4">
       <div className="relative max-w-xs">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
+          key={filters.search}
           placeholder="Search description, hooks, or hashtags..."
-          value={search}
+          defaultValue={filters.search}
           onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(0);
+            if (searchTimeout.current !== null) {
+              window.clearTimeout(searchTimeout.current);
+            }
+            const value = e.target.value;
+            searchTimeout.current = window.setTimeout(() => {
+              updateQuery(router, pathname, { search: value, page: 1 });
+            }, 250);
           }}
           className="pl-8"
         />
@@ -245,27 +272,42 @@ export function VideosClient({
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
         <Filter className="size-4 text-muted-foreground shrink-0" />
 
-        <LabeledSelect label="App" value={appFilter} onChange={(val) => { setAppFilter(val); setPage(0); }}>
+        <LabeledSelect
+          label="App"
+          value={filters.app}
+          onChange={(val) => {
+            updateQuery(router, pathname, { app: val, page: 1 });
+          }}
+        >
           <SelectItem value="all">All Apps</SelectItem>
           {apps.map((app) => (
-            <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
+            <SelectItem key={app.id} value={app.id}>
+              {app.name}
+            </SelectItem>
           ))}
         </LabeledSelect>
 
-        <LabeledSelect label="Format" value={formatFilter} onChange={(val) => { setFormatFilter(val); setPage(0); }}>
+        <LabeledSelect
+          label="Format"
+          value={filters.format}
+          onChange={(val) => {
+            updateQuery(router, pathname, { format: val, page: 1 });
+          }}
+        >
           <SelectItem value="all">All Formats</SelectItem>
           {formatOptions.map(([key, label]) => (
-            <SelectItem key={key} value={key}>{label}</SelectItem>
+            <SelectItem key={key} value={key}>
+              {label}
+            </SelectItem>
           ))}
         </LabeledSelect>
 
         <Input
           type="number"
           placeholder="Min views..."
-          value={minViews}
+          value={filters.minViews}
           onChange={(e) => {
-            setMinViews(e.target.value);
-            setPage(0);
+            updateQuery(router, pathname, { minViews: e.target.value, page: 1 });
           }}
           className="w-32 h-8 text-xs"
         />
@@ -276,15 +318,14 @@ export function VideosClient({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Showing {paged.length} of {filtered.length} videos (total:{" "}
-        {formatNumber(totalCount)})
+        Showing {videos.length} of {totalCount} videos
       </p>
 
       {view === "grid" ? (
-        <VideoGrid videos={paged} />
+        <VideoGrid videos={videos} />
       ) : (
         <div className="overflow-x-auto">
-          <DataTable columns={columns} data={paged} />
+          <DataTable columns={columns} data={videos} />
         </div>
       )}
 
@@ -293,19 +334,19 @@ export function VideosClient({
           <Button
             variant="outline"
             size="sm"
-            disabled={page === 0}
-            onClick={() => setPage((p) => p - 1)}
+            disabled={page === 1}
+            onClick={() => updateQuery(router, pathname, { page: page - 1 })}
           >
             Previous
           </Button>
           <span className="text-xs text-muted-foreground">
-            Page {page + 1} of {totalPages}
+            Page {page} of {totalPages}
           </span>
           <Button
             variant="outline"
             size="sm"
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage((p) => p + 1)}
+            disabled={page >= totalPages}
+            onClick={() => updateQuery(router, pathname, { page: page + 1 })}
           >
             Next
           </Button>

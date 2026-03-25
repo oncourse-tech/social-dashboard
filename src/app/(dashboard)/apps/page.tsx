@@ -17,31 +17,99 @@ import { FORMAT_LABELS } from "@/lib/constants";
 import { type VideoFormat } from "@prisma/client";
 
 export default async function AppsPage() {
-  const settings = await db.settings.findFirst({ where: { id: "default" } });
-  const threshold1 = settings?.viralThreshold1 ?? 5000;
-  const threshold2 = settings?.viralThreshold2 ?? 50000;
-
-  const apps = await db.app.findMany({
-    include: {
-      trackedAccounts: {
-        include: {
-          videos: {
-            select: { views: true, postedAt: true, format: true },
+  const [settings, apps] = await Promise.all([
+    db.settings.findFirst({ where: { id: "default" } }),
+    db.app.findMany({
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        url: true,
+        trackedAccounts: {
+          select: {
+            id: true,
+            followers: true,
+            totalLikes: true,
+            totalVideos: true,
           },
         },
       },
-    },
-    orderBy: { name: "asc" },
-  });
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  const threshold1 = settings?.viralThreshold1 ?? 5000;
+  const threshold2 = settings?.viralThreshold2 ?? 50000;
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  let grandTotalAccounts = 0;
-  let grandTotalVideos = 0;
-  let grandVideos7d = 0;
-  let grandViral5k = 0;
-  let grandViral50k = 0;
+  const accountIdToAppId = new Map<string, string>();
+  const accountIds: string[] = [];
+
+  for (const app of apps) {
+    for (const account of app.trackedAccounts) {
+      accountIdToAppId.set(account.id, app.id);
+      accountIds.push(account.id);
+    }
+  }
+
+  const [videos7dRows, viral5kRows, viral50kRows, formatRows] =
+    accountIds.length === 0
+      ? [[], [], [], []]
+      : await Promise.all([
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              postedAt: { gte: sevenDaysAgo },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              views: { gte: threshold1, lt: threshold2 },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              views: { gte: threshold2 },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId", "format"],
+            where: { accountId: { in: accountIds } },
+            _count: { _all: true },
+          }),
+        ]);
+
+  const videos7dByAccount = new Map(
+    videos7dRows.map((row) => [row.accountId, row._count._all])
+  );
+  const viral5kByAccount = new Map(
+    viral5kRows.map((row) => [row.accountId, row._count._all])
+  );
+  const viral50kByAccount = new Map(
+    viral50kRows.map((row) => [row.accountId, row._count._all])
+  );
+  const formatCountsByApp = new Map<string, Map<string, number>>();
+
+  for (const row of formatRows) {
+    const appId = accountIdToAppId.get(row.accountId);
+    if (!appId) continue;
+    const appFormats = formatCountsByApp.get(appId) ?? new Map<string, number>();
+    appFormats.set(
+      row.format,
+      (appFormats.get(row.format) ?? 0) + row._count._all
+    );
+    formatCountsByApp.set(appId, appFormats);
+  }
 
   const enrichedApps: (AppWithStats & { topFormat: string })[] = apps.map((app) => {
     let totalFollowers = 0;
@@ -50,31 +118,20 @@ export default async function AppsPage() {
     let videos7d = 0;
     let viral5k = 0;
     let viral50k = 0;
-    const formatCounts: Record<string, number> = {};
+    const formatCounts = formatCountsByApp.get(app.id);
 
     for (const account of app.trackedAccounts) {
       totalFollowers += account.followers;
       totalLikes += account.totalLikes;
-      totalVideos += account.videos.length;
-
-      for (const video of account.videos) {
-        if (video.postedAt >= sevenDaysAgo) videos7d++;
-        if (video.views >= threshold2) viral50k++;
-        else if (video.views >= threshold1) viral5k++;
-
-        formatCounts[video.format] = (formatCounts[video.format] || 0) + 1;
-      }
+      totalVideos += account.totalVideos;
+      videos7d += videos7dByAccount.get(account.id) ?? 0;
+      viral5k += viral5kByAccount.get(account.id) ?? 0;
+      viral50k += viral50kByAccount.get(account.id) ?? 0;
     }
 
-    grandTotalAccounts += app.trackedAccounts.length;
-    grandTotalVideos += totalVideos;
-    grandVideos7d += videos7d;
-    grandViral5k += viral5k;
-    grandViral50k += viral50k;
-
-    const topFormatEntry = Object.entries(formatCounts).sort(
-      (a, b) => b[1] - a[1]
-    )[0];
+    const topFormatEntry = formatCounts
+      ? [...formatCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+      : undefined;
     const topFormat = topFormatEntry
       ? FORMAT_LABELS[topFormatEntry[0] as VideoFormat]
       : "N/A";
@@ -94,6 +151,27 @@ export default async function AppsPage() {
       topFormat,
     };
   });
+
+  const grandTotalAccounts = enrichedApps.reduce(
+    (total, app) => total + app.accountCount,
+    0
+  );
+  const grandTotalVideos = enrichedApps.reduce(
+    (total, app) => total + app.totalVideos,
+    0
+  );
+  const grandVideos7d = enrichedApps.reduce(
+    (total, app) => total + app.videos7d,
+    0
+  );
+  const grandViral5k = enrichedApps.reduce(
+    (total, app) => total + app.viral5k,
+    0
+  );
+  const grandViral50k = enrichedApps.reduce(
+    (total, app) => total + app.viral50k,
+    0
+  );
 
   const summaryItems = [
     { label: "Total Apps", value: apps.length, icon: <LayoutGrid className="size-5" /> },

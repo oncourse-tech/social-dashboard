@@ -5,8 +5,6 @@ import { SummaryCards } from "@/components/summary-cards";
 import { AddAccountDialog } from "@/components/add-account-dialog";
 import { AccountsTable } from "./accounts-table";
 import type { AccountWithStats } from "@/types";
-import { FORMAT_LABELS } from "@/lib/constants";
-import { type VideoFormat } from "@prisma/client";
 
 export default async function AccountsPage({
   searchParams,
@@ -16,53 +14,107 @@ export default async function AccountsPage({
   const params = await searchParams;
   const appFilter = params.app;
 
-  const settings = await db.settings.findFirst({ where: { id: "default" } });
+  const [settings, accounts, apps] = await Promise.all([
+    db.settings.findFirst({ where: { id: "default" } }),
+    db.trackedAccount.findMany({
+      where: appFilter ? { appId: appFilter } : undefined,
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        followers: true,
+        totalLikes: true,
+        totalVideos: true,
+        lastPostedAt: true,
+        lastSyncedAt: true,
+        trackingSince: true,
+        app: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: { username: "asc" },
+    }),
+    db.app.findMany({
+      select: { id: true, name: true, color: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
   const threshold1 = settings?.viralThreshold1 ?? 5000;
   const threshold2 = settings?.viralThreshold2 ?? 50000;
-
-  const accounts = await db.trackedAccount.findMany({
-    where: appFilter ? { appId: appFilter } : undefined,
-    include: {
-      app: { select: { id: true, name: true, color: true } },
-      videos: { select: { views: true, postedAt: true, format: true } },
-    },
-    orderBy: { username: "asc" },
-  });
-
-  const apps = await db.app.findMany({
-    select: { id: true, name: true, color: true },
-    orderBy: { name: "asc" },
-  });
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  let grandFollowers = 0;
-  let grandVideos = 0;
+  const accountIds = accounts.map((account) => account.id);
+  const [weeklyVideos, viral5kVideos, viral10kVideos, viral50kVideos, formatRows] =
+    accountIds.length === 0
+      ? [[], [], [], [], []]
+      : await Promise.all([
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              postedAt: { gte: sevenDaysAgo },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              views: { gte: threshold1, lt: 10000 },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              views: { gte: 10000, lt: threshold2 },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId"],
+            where: {
+              accountId: { in: accountIds },
+              views: { gte: threshold2 },
+            },
+            _count: { _all: true },
+          }),
+          db.video.groupBy({
+            by: ["accountId", "format"],
+            where: { accountId: { in: accountIds } },
+            _count: { _all: true },
+          }),
+        ]);
 
-  const enrichedAccounts: (AccountWithStats & { dominantFormat: string | null })[] =
-    accounts.map((account) => {
-      let videos7d = 0;
-      let viral5k = 0;
-      let viral10k = 0;
-      let viral50k = 0;
-      const formatCounts: Record<string, number> = {};
+  const weeklyVideosByAccount = new Map(
+    weeklyVideos.map((row) => [row.accountId, row._count._all])
+  );
+  const viral5kByAccount = new Map(
+    viral5kVideos.map((row) => [row.accountId, row._count._all])
+  );
+  const viral10kByAccount = new Map(
+    viral10kVideos.map((row) => [row.accountId, row._count._all])
+  );
+  const viral50kByAccount = new Map(
+    viral50kVideos.map((row) => [row.accountId, row._count._all])
+  );
+  const formatCountsByAccount = new Map<string, Map<string, number>>();
 
-      for (const video of account.videos) {
-        if (video.postedAt >= sevenDaysAgo) videos7d++;
-        if (video.views >= threshold2) viral50k++;
-        else if (video.views >= 10000) viral10k++;
-        else if (video.views >= threshold1) viral5k++;
+  for (const row of formatRows) {
+    const accountFormats =
+      formatCountsByAccount.get(row.accountId) ?? new Map<string, number>();
+    accountFormats.set(row.format, row._count._all);
+    formatCountsByAccount.set(row.accountId, accountFormats);
+  }
 
-        formatCounts[video.format] = (formatCounts[video.format] || 0) + 1;
-      }
-
-      grandFollowers += account.followers;
-      grandVideos += account.videos.length;
-
-      const topFormatEntry = Object.entries(formatCounts).sort(
-        (a, b) => b[1] - a[1]
-      )[0];
+  const enrichedAccounts: (AccountWithStats & { dominantFormat: string | null })[] = accounts.map((account) => {
+      const formatCounts = formatCountsByAccount.get(account.id);
+      const topFormatEntry = formatCounts
+        ? [...formatCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+        : undefined;
       const dominantFormat = topFormatEntry ? topFormatEntry[0] : null;
 
       return {
@@ -72,18 +124,27 @@ export default async function AccountsPage({
         avatarUrl: account.avatarUrl,
         followers: account.followers,
         totalLikes: account.totalLikes,
-        totalVideos: account.videos.length,
+        totalVideos: account.totalVideos,
         lastPostedAt: account.lastPostedAt,
         lastSyncedAt: account.lastSyncedAt,
         trackingSince: account.trackingSince,
         app: account.app,
-        videos7d,
-        viral5k,
-        viral10k,
-        viral50k,
+        videos7d: weeklyVideosByAccount.get(account.id) ?? 0,
+        viral5k: viral5kByAccount.get(account.id) ?? 0,
+        viral10k: viral10kByAccount.get(account.id) ?? 0,
+        viral50k: viral50kByAccount.get(account.id) ?? 0,
         dominantFormat,
       };
     });
+
+  const grandFollowers = enrichedAccounts.reduce(
+    (total, account) => total + account.followers,
+    0
+  );
+  const grandVideos = enrichedAccounts.reduce(
+    (total, account) => total + account.totalVideos,
+    0
+  );
 
   const filterApp = appFilter
     ? apps.find((a) => a.id === appFilter)

@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { db } from "@/lib/db";
@@ -11,12 +12,19 @@ import { formatDate } from "@/lib/utils";
 import { AccountVideos } from "./account-videos";
 import type { VideoFormat } from "@prisma/client";
 
+const PAGE_SIZE = 50;
+
 export default async function AccountDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ username: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { username } = await params;
+  const paramsSearch = await searchParams;
+  const requestedPage = Number.parseInt(paramsSearch.page ?? "1", 10);
+  const currentPage = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
   const settings = await db.settings.findFirst({ where: { id: "default" } });
   const threshold1 = settings?.viralThreshold1 ?? 5000;
@@ -24,36 +32,54 @@ export default async function AccountDetailPage({
 
   const account = await db.trackedAccount.findUnique({
     where: { username },
-    include: {
+    select: {
+      id: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      followers: true,
+      totalLikes: true,
+      trackingSince: true,
       app: { select: { id: true, name: true, color: true } },
-      videos: {
-        orderBy: { postedAt: "desc" },
-      },
     },
   });
 
   if (!account) return notFound();
 
-  let viral5k = 0;
-  let viral10k = 0;
-  let viral50k = 0;
+  const [totalVideos, viral5k, viral10k, viral50k] = await Promise.all([
+    db.video.count({ where: { accountId: account.id } }),
+    db.video.count({
+      where: { accountId: account.id, views: { gte: threshold1, lt: 10000 } },
+    }),
+    db.video.count({
+      where: { accountId: account.id, views: { gte: 10000, lt: threshold2 } },
+    }),
+    db.video.count({
+      where: { accountId: account.id, views: { gte: threshold2 } },
+    }),
+  ]);
 
-  for (const video of account.videos) {
-    if (video.views >= threshold2) viral50k++;
-    else if (video.views >= 10000) viral10k++;
-    else if (video.views >= threshold1) viral5k++;
-  }
+  const totalPages = Math.max(1, Math.ceil(totalVideos / PAGE_SIZE));
+  const page = Math.min(currentPage, totalPages);
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const videos = await db.video.findMany({
+    where: { accountId: account.id },
+    orderBy: { postedAt: "desc" },
+    skip,
+    take: PAGE_SIZE,
+  });
 
   const viralTotal = viral5k + viral10k + viral50k;
 
   const summaryItems = [
     { label: "Followers", value: account.followers },
     { label: "Total Likes", value: account.totalLikes },
-    { label: "Total Videos", value: account.videos.length },
+    { label: "Total Videos", value: totalVideos },
     { label: "Viral Videos", value: viralTotal },
   ];
 
-  const videosData = account.videos.map((v) => ({
+  const videosData = videos.map((v) => ({
     id: v.id,
     tiktokVideoId: v.tiktokVideoId,
     description: v.description,
@@ -70,6 +96,9 @@ export default async function AccountDetailPage({
     cta: v.cta,
     account: { username: account.username },
   }));
+
+  const prevPage = Math.max(1, page - 1);
+  const nextPage = Math.min(totalPages, page + 1);
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,6 +152,26 @@ export default async function AccountDetailPage({
           {viral50k > 0 && (
             <span className="text-red-400">{viral50k} at 50K+</span>
           )}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" disabled={page === 1}>
+              <Link href={`/accounts/${account.username}?page=${prevPage}`}>
+                Previous
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" disabled={page === totalPages}>
+              <Link href={`/accounts/${account.username}?page=${nextPage}`}>
+                Next
+              </Link>
+            </Button>
+          </div>
         </div>
       )}
 
