@@ -1,10 +1,15 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const transport = new DefaultChatTransport({
+  api: "/api/studio/chat",
+});
 
 interface ChatPanelProps {
   onSlugDetected: (slug: string) => void;
@@ -15,7 +20,7 @@ const MANIFEST_RE = /MANIFEST:.*\/posts\/photo\/([^/]+)\/manifest\.json/;
 const SLUG_RE = /(?:generating|rendering).*?(?:slug|concept)[:\s]+["']?([a-z0-9-]+)/i;
 
 export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
-  const { messages, sendMessage, status } = useChat({ api: "/api/studio/chat" });
+  const { messages, sendMessage, status } = useChat({ transport });
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
