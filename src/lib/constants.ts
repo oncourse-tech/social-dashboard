@@ -31,6 +31,12 @@ export const NAV_ITEMS = [
     ],
   },
   {
+    section: "CREATE",
+    items: [
+      { label: "Studio", href: "/studio", icon: "Clapperboard" },
+    ],
+  },
+  {
     section: "SYSTEM",
     items: [
       { label: "Settings", href: "/settings", icon: "Settings" },

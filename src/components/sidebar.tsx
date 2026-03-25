@@ -13,6 +13,7 @@ import {
   Upload,
   Settings,
   RefreshCw,
+  Clapperboard,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Upload,
   Settings,
   RefreshCw,
+  Clapperboard,
 };
 
 function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
@@ -52,7 +54,8 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = ICON_MAP[item.icon];
-                const active = pathname === item.href;
+                const active = pathname === item.href ||
+                  (item.href === "/studio" && pathname.startsWith("/studio"));
                 return (
                   <li key={item.href}>
                     <Link
