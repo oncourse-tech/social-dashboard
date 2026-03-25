@@ -192,7 +192,7 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
                     ) : (
                       <div className="text-[13px] leading-relaxed text-foreground/90 streamdown-wrapper">
                         <Streamdown
-                          mode={isLastAssistant && isStreaming ? "typewriter" : "normal"}
+                          mode={isLastAssistant && isStreaming ? "streaming" : "static"}
                         >
                           {text}
                         </Streamdown>

@@ -161,16 +161,20 @@ export default async function AccountDetailPage({
             Page {page} of {totalPages}
           </span>
           <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" disabled={page === 1}>
+            {page === 1 ? (
+              <Button variant="outline" size="sm" disabled>Previous</Button>
+            ) : (
               <Link href={`/accounts/${account.username}?page=${prevPage}`}>
-                Previous
+                <Button variant="outline" size="sm">Previous</Button>
               </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" disabled={page === totalPages}>
+            )}
+            {page === totalPages ? (
+              <Button variant="outline" size="sm" disabled>Next</Button>
+            ) : (
               <Link href={`/accounts/${account.username}?page=${nextPage}`}>
-                Next
+                <Button variant="outline" size="sm">Next</Button>
               </Link>
-            </Button>
+            )}
           </div>
         </div>
       )}
