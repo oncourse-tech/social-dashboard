@@ -14,10 +14,24 @@ function extractText(msg: UIMessage): string {
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
-  const openaiMessages = messages.map((msg) => ({
-    role: msg.role,
-    content: extractText(msg),
-  }));
+  const openaiMessages = [
+    {
+      role: "system",
+      content: `You are a slideshow production assistant. Use the tiktok-brain skill to generate photorealistic slideshows.
+
+Follow the production-slides workflow from the tiktok-brain skill:
+1. Write 6 slide texts (Hook → Problem → Discovery → Reveal → Result → CTA)
+2. Run generate-photo-slides.js at ~/clawd-oncourse/tiktok-marketing/scripts/generate-photo-slides.js
+3. Use flags: --concept, --texts, --scene, --account @oncourse.usmle, --cta
+
+After generation completes, output:
+MANIFEST:~/clawd-oncourse/tiktok-marketing/posts/photo/{slug}/manifest.json`,
+    },
+    ...messages.map((msg) => ({
+      role: msg.role,
+      content: extractText(msg),
+    })),
+  ];
 
   const response = await fetch(
     `${process.env.OPENCLAW_GATEWAY_URL}/v1/chat/completions`,
