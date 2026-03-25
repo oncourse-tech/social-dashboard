@@ -26,13 +26,13 @@ function extractText(msg: UIMessage): string {
   );
 }
 
-const HEARTBEAT_INTERVAL = 5000; // 5 seconds
-const PROGRESS_MESSAGES = [
-  "\n\n> ⏳ Running tools...",
-  "\n> 🎨 Generating images...",
-  "\n> 🎨 Still generating...",
-  "\n> 🎨 Almost there...",
-  "\n> 📤 Processing...",
+const HEARTBEAT_INTERVAL = 4000;
+const PROGRESS_PHASES = [
+  "Running tools",
+  "Generating images",
+  "Still generating",
+  "Almost there",
+  "Uploading slides",
 ];
 
 export async function POST(req: Request) {
@@ -78,6 +78,7 @@ export async function POST(req: Request) {
       let textStarted = false;
       let done = false;
       let heartbeatCount = 0;
+      let lastDataTime = Date.now();
 
       function ensureTextStarted() {
         if (!textStarted) {
@@ -99,6 +100,15 @@ export async function POST(req: Request) {
         );
       }
 
+      // Send custom data event for progress status (not text)
+      function sendProgress(phase: string) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "data-progress", data: { phase } })}\n\n`
+          )
+        );
+      }
+
       // Start message
       controller.enqueue(
         encoder.encode(
@@ -106,12 +116,18 @@ export async function POST(req: Request) {
         )
       );
 
-      // Heartbeat: send progress messages when stream is idle
+      // Heartbeat: send progress events (not text) when stream is idle
       const heartbeatTimer = setInterval(() => {
         if (done) return;
-        const msg = PROGRESS_MESSAGES[Math.min(heartbeatCount, PROGRESS_MESSAGES.length - 1)];
-        sendDelta(msg);
-        heartbeatCount++;
+        const idle = Date.now() - lastDataTime;
+        if (idle > 3000) {
+          const phase =
+            PROGRESS_PHASES[
+              Math.min(heartbeatCount, PROGRESS_PHASES.length - 1)
+            ];
+          sendProgress(phase);
+          heartbeatCount++;
+        }
       }, HEARTBEAT_INTERVAL);
 
       try {
@@ -122,8 +138,11 @@ export async function POST(req: Request) {
             break;
           }
 
-          // Reset heartbeat counter on real data
+          lastDataTime = Date.now();
           heartbeatCount = 0;
+
+          // Clear progress when real data arrives
+          sendProgress("");
 
           buffer += decoder.decode(result.value, { stream: true });
           const lines = buffer.split("\n");
@@ -137,23 +156,21 @@ export async function POST(req: Request) {
             try {
               const parsed = JSON.parse(data);
 
-              // OpenResponses text deltas
               if (parsed.type === "response.output_text.delta") {
                 sendDelta(parsed.delta);
               }
 
-              // Fallback: chat completions format
               if (parsed.choices?.[0]?.delta?.content) {
                 sendDelta(parsed.choices[0].delta.content);
               }
             } catch {
-              // Skip unparseable
+              // Skip
             }
           }
         }
 
-        // Cleanup
         clearInterval(heartbeatTimer);
+        sendProgress("");
 
         if (textStarted) {
           controller.enqueue(

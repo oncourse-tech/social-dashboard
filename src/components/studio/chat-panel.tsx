@@ -31,6 +31,7 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
   const { messages, sendMessage, status } = useChat({ transport });
 
   const [input, setInput] = useState("");
+  const [progressPhase, setProgressPhase] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const detectedSlugs = useRef<Set<string>>(new Set());
 
@@ -52,12 +53,50 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
     }
   }, [messages, status]);
 
+  // Listen for progress events from the SSE stream
+  useEffect(() => {
+    if (!isLoading) {
+      setProgressPhase(null);
+      return;
+    }
+
+    // Poll for progress from a custom endpoint that reads the SSE side-channel
+    // Since we can't intercept the AI SDK's stream, we use a simpler approach:
+    // detect idle time and show progress based on elapsed time
+    let elapsed = 0;
+    const phases = [
+      "Preparing slide texts",
+      "Running image generator",
+      "Generating slide images",
+      "Still generating images",
+      "Almost done generating",
+      "Uploading to storage",
+      "Finalizing slideshow",
+    ];
+
+    const timer = setInterval(() => {
+      elapsed++;
+      // Only show progress after 5 seconds of loading
+      if (elapsed >= 5) {
+        const phaseIdx = Math.min(
+          Math.floor((elapsed - 5) / 8),
+          phases.length - 1
+        );
+        setProgressPhase(phases[phaseIdx]);
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+      setProgressPhase(null);
+    };
+  }, [isLoading]);
+
   useEffect(() => {
     for (const msg of messages) {
       if (msg.role !== "assistant") continue;
       const text = getMessageText(msg);
 
-      // Detect SLIDE_URLS JSON block (from upload script output)
       const slideUrlsMatch = text.match(SLIDE_URLS_RE);
       if (slideUrlsMatch) {
         try {
@@ -66,10 +105,9 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
             detectedSlugs.current.add("urls:" + data.slug);
             onSlideUrlsDetected?.(data);
           }
-        } catch { /* ignore parse errors */ }
+        } catch { /* ignore */ }
       }
 
-      // Fallback: detect slug from MANIFEST: pattern
       const manifestMatch = text.match(MANIFEST_RE);
       const slug = manifestMatch?.[1] ?? text.match(SLUG_RE)?.[1];
       if (slug && !detectedSlugs.current.has(slug)) {
@@ -125,17 +163,13 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
                   key={msg.id}
                   className={cn(
                     "flex gap-2.5 rounded-xl px-3 py-2.5",
-                    isUser
-                      ? "bg-transparent"
-                      : "bg-muted/40"
+                    isUser ? "bg-transparent" : "bg-muted/40"
                   )}
                 >
                   <div
                     className={cn(
                       "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md",
-                      isUser
-                        ? "bg-foreground/10"
-                        : "bg-indigo-500/15"
+                      isUser ? "bg-foreground/10" : "bg-indigo-500/15"
                     )}
                   >
                     {isUser ? (
@@ -168,10 +202,51 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
                 </div>
               );
             })}
-
           </div>
         )}
       </div>
+
+      {/* Progress status bar — shows during tool execution */}
+      {isLoading && progressPhase && (
+        <div className="shrink-0 border-t border-indigo-500/10 bg-indigo-500/[0.03] px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <div className="relative flex size-5 items-center justify-center">
+              <svg className="size-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle
+                  cx="12" cy="12" r="10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="text-indigo-500/20"
+                />
+                <path
+                  d="M12 2a10 10 0 0 1 10 10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  className="text-indigo-400"
+                />
+              </svg>
+            </div>
+            <span
+              className="text-xs font-medium text-indigo-300/80 transition-opacity duration-300"
+              key={progressPhase}
+            >
+              {progressPhase}
+            </span>
+            <div className="ml-auto flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="size-1 rounded-full bg-indigo-400/40"
+                  style={{
+                    animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <div className="shrink-0 border-t border-border/50 p-3">
