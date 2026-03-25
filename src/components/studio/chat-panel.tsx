@@ -5,7 +5,8 @@ import { DefaultChatTransport } from "ai";
 import { useState, useEffect, useRef } from "react";
 import { ArrowUp, Sparkles, Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Streamdown from "streamdown";
+import { Streamdown } from "streamdown";
+import "streamdown/styles.css";
 
 const transport = new DefaultChatTransport({
   api: "/api/studio/chat",
@@ -126,11 +127,12 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
                     <p className="text-[11px] font-medium text-muted-foreground mb-1">
                       {isUser ? "You" : "Agent"}
                     </p>
-                    <div className="text-[13px] leading-relaxed text-foreground/90 prose prose-sm prose-invert max-w-none prose-p:my-1 prose-pre:bg-white/5 prose-pre:text-xs prose-code:text-indigo-300 prose-headings:text-foreground/90 prose-strong:text-foreground/90 prose-li:my-0.5">
+                    <div className="text-[13px] leading-relaxed text-foreground/90 streamdown-wrapper">
                       <Streamdown
-                        text={text}
                         mode={isLastAssistant && isStreaming ? "typewriter" : "normal"}
-                      />
+                      >
+                        {text}
+                      </Streamdown>
                     </div>
                   </div>
                 </div>
