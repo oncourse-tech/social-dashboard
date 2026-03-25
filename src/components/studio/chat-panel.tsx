@@ -64,26 +64,28 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
     // Since we can't intercept the AI SDK's stream, we use a simpler approach:
     // detect idle time and show progress based on elapsed time
     let elapsed = 0;
+    // Phases spread across ~3.5 minutes (210s)
+    // Each phase lasts ~30s to cover the full generation time
     const phases = [
-      "Preparing slide texts",
-      "Running image generator",
-      "Generating slide images",
-      "Still generating images",
-      "Almost done generating",
-      "Uploading to storage",
-      "Finalizing slideshow",
+      { at: 0, text: "Agent is working..." },
+      { at: 8, text: "Writing slide texts..." },
+      { at: 25, text: "Running image generator..." },
+      { at: 50, text: "Generating slide 1 of 6..." },
+      { at: 75, text: "Generating slide 3 of 6..." },
+      { at: 100, text: "Generating slide 5 of 6..." },
+      { at: 130, text: "Finishing image generation..." },
+      { at: 155, text: "Uploading slides to storage..." },
+      { at: 180, text: "Almost done..." },
     ];
 
     const timer = setInterval(() => {
       elapsed++;
-      // Only show progress after 5 seconds of loading
-      if (elapsed >= 5) {
-        const phaseIdx = Math.min(
-          Math.floor((elapsed - 5) / 8),
-          phases.length - 1
-        );
-        setProgressPhase(phases[phaseIdx]);
+      // Find the latest phase that has been reached
+      let current = phases[0].text;
+      for (const p of phases) {
+        if (elapsed >= p.at) current = p.text;
       }
+      setProgressPhase(current);
     }, 1000);
 
     return () => {
@@ -185,8 +187,8 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
                     {!isUser && isLastAssistant && isLoading && !text ? (
                       <div className="flex items-center gap-2 py-0.5">
                         <Loader2 className="size-3.5 animate-spin text-indigo-400" />
-                        <span className="text-xs text-muted-foreground">
-                          Agent is working...
+                        <span className="text-xs text-muted-foreground" key={progressPhase}>
+                          {progressPhase || "Agent is working..."}
                         </span>
                       </div>
                     ) : (
@@ -205,48 +207,6 @@ export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: Ch
           </div>
         )}
       </div>
-
-      {/* Progress status bar — shows during tool execution */}
-      {isLoading && progressPhase && (
-        <div className="shrink-0 border-t border-indigo-500/10 bg-indigo-500/[0.03] px-4 py-2.5">
-          <div className="flex items-center gap-3">
-            <div className="relative flex size-5 items-center justify-center">
-              <svg className="size-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle
-                  cx="12" cy="12" r="10"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-indigo-500/20"
-                />
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  className="text-indigo-400"
-                />
-              </svg>
-            </div>
-            <span
-              className="text-xs font-medium text-indigo-300/80 transition-opacity duration-300"
-              key={progressPhase}
-            >
-              {progressPhase}
-            </span>
-            <div className="ml-auto flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="size-1 rounded-full bg-indigo-400/40"
-                  style={{
-                    animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Input */}
       <div className="shrink-0 border-t border-border/50 p-3">
