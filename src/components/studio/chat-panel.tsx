@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,37 +15,62 @@ const MANIFEST_RE = /MANIFEST:.*\/posts\/photo\/([^/]+)\/manifest\.json/;
 const SLUG_RE = /(?:generating|rendering).*?(?:slug|concept)[:\s]+["']?([a-z0-9-]+)/i;
 
 export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, append } =
-    useChat({ api: "/api/studio/chat" });
+  const { messages, sendMessage, status } = useChat({ api: "/api/studio/chat" });
 
+  const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const detectedSlugs = useRef<Set<string>>(new Set());
 
+  const isLoading = status === "streaming" || status === "submitted";
+
+  // Expose sendMessage so parent can send messages programmatically
   useEffect(() => {
     if (appendRef) {
       appendRef.current = (text: string) => {
-        append({ role: "user", content: text });
+        sendMessage({ text });
       };
     }
-  }, [append, appendRef]);
+  }, [sendMessage, appendRef]);
 
+  // Auto-scroll on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
+  // Detect slug from assistant messages
   useEffect(() => {
     for (const msg of messages) {
       if (msg.role !== "assistant") continue;
-      const manifestMatch = msg.content.match(MANIFEST_RE);
-      const slug = manifestMatch?.[1] ?? msg.content.match(SLUG_RE)?.[1];
+      const text = msg.parts
+        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join("") ?? "";
+      const manifestMatch = text.match(MANIFEST_RE);
+      const slug = manifestMatch?.[1] ?? text.match(SLUG_RE)?.[1];
       if (slug && !detectedSlugs.current.has(slug)) {
         detectedSlugs.current.add(slug);
         onSlugDetected(slug);
       }
     }
   }, [messages, onSlugDetected]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    sendMessage({ text: input });
+    setInput("");
+  };
+
+  const getMessageText = (msg: typeof messages[number]): string => {
+    return (
+      msg.parts
+        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join("") ?? ""
+    );
+  };
 
   return (
     <div className="flex h-full flex-col border-r border-border">
@@ -71,7 +96,7 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
                 : "bg-muted"
             )}
           >
-            <p className="whitespace-pre-wrap">{msg.content}</p>
+            <p className="whitespace-pre-wrap">{getMessageText(msg)}</p>
           </div>
         ))}
         {isLoading && messages[messages.length - 1]?.role === "user" && (
@@ -91,7 +116,7 @@ export function ChatPanel({ onSlugDetected, appendRef }: ChatPanelProps) {
       >
         <input
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="Describe your slideshow concept..."
           className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
