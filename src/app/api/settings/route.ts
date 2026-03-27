@@ -1,10 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { CACHE_TAGS, revalidateCacheTags } from "@/lib/cache";
-import { getSettings } from "@/lib/queries";
 
 export async function GET() {
-  return NextResponse.json(await getSettings());
+  const settings = await db.settings.findFirst({ where: { id: "default" } });
+
+  if (!settings) {
+    // Return defaults
+    return NextResponse.json({
+      viralThreshold1: 5000,
+      viralThreshold2: 50000,
+      apifyApiKey: "",
+      apifyActorId: "",
+      geminiApiKey: "",
+      syncCron: "0 6 * * *",
+    });
+  }
+
+  return NextResponse.json({
+    viralThreshold1: settings.viralThreshold1,
+    viralThreshold2: settings.viralThreshold2,
+    apifyApiKey: settings.apifyApiKey,
+    apifyActorId: settings.apifyActorId,
+    geminiApiKey: settings.geminiApiKey,
+    syncCron: settings.syncCron,
+  });
 }
 
 export async function PUT(request: NextRequest) {
@@ -45,12 +64,6 @@ export async function PUT(request: NextRequest) {
       syncCron,
     },
   });
-
-  await revalidateCacheTags([
-    CACHE_TAGS.settings,
-    CACHE_TAGS.appSummaries,
-    CACHE_TAGS.accountSummaries,
-  ]);
 
   return NextResponse.json({
     viralThreshold1: settings.viralThreshold1,
