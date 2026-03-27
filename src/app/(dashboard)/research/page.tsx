@@ -68,7 +68,7 @@ export default function ResearchPage() {
     setAdding(true);
     try {
       // Fetch apps to get first available app
-      const appsRes = await fetch("/api/apps?view=options");
+      const appsRes = await fetch("/api/apps");
       const apps = await appsRes.json();
       if (!apps.length) {
         setError("No apps configured. Add an app first.");

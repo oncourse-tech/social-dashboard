@@ -31,7 +31,7 @@ export default function ImportPage() {
   const [result, setResult] = useState<ImportResult | null>(null);
 
   useEffect(() => {
-    fetch("/api/apps?view=options")
+    fetch("/api/apps")
       .then((r) => r.json())
       .then((data: AppOption[]) => {
         setApps(data);
