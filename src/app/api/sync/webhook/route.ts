@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getDatasetItems } from "@/lib/apify";
 // apify-client is marked as serverExternalPackages in next.config.ts
 import { analyzeVideo } from "@/lib/gemini";
+import { CACHE_TAGS, revalidateCacheTags } from "@/lib/cache";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,11 +54,16 @@ export async function POST(request: NextRequest) {
       itemsByUsername.get(username)!.push(item);
     }
 
+    const trackedAccounts = await db.trackedAccount.findMany({
+      where: { username: { in: [...itemsByUsername.keys()] } },
+    });
+    const accountsByUsername = new Map(
+      trackedAccounts.map((account) => [account.username, account])
+    );
+
     for (const [username, videoItems] of itemsByUsername) {
       try {
-        const account = await db.trackedAccount.findUnique({
-          where: { username },
-        });
+        const account = accountsByUsername.get(username);
 
         if (!account) continue;
 
@@ -72,6 +78,8 @@ export async function POST(request: NextRequest) {
           account.avatarUrl) as string | null;
         const tiktokId = (authorMeta.id ?? account.tiktokId) as string | null;
 
+        const reportedTotalVideos = Number(authorMeta.video ?? account.totalVideos);
+
         await db.trackedAccount.update({
           where: { id: account.id },
           data: {
@@ -81,6 +89,7 @@ export async function POST(request: NextRequest) {
             bio,
             avatarUrl,
             tiktokId,
+            totalVideos: reportedTotalVideos,
             lastSyncedAt: new Date(),
           },
         });
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
             accountId: account.id,
             followers,
             totalLikes,
-            totalVideos: account.totalVideos,
+            totalVideos: reportedTotalVideos,
           },
         });
 
@@ -99,7 +108,19 @@ export async function POST(request: NextRequest) {
 
         // Process each video item
         let latestPostedAt: Date | null = null;
-        let videoCount = 0;
+        let accountNewVideos = 0;
+        const tiktokVideoIds = videoItems
+          .map((video) => String(video.id ?? ""))
+          .filter(Boolean);
+        const existingVideos = tiktokVideoIds.length
+          ? await db.video.findMany({
+              where: { tiktokVideoId: { in: tiktokVideoIds } },
+              select: { id: true, tiktokVideoId: true },
+            })
+          : [];
+        const existingVideosByTikTokId = new Map(
+          existingVideos.map((video) => [video.tiktokVideoId, video])
+        );
 
         for (const video of videoItems) {
           const tiktokVideoId = String(video.id ?? "");
@@ -132,9 +153,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Check if video already exists
-          const existing = await db.video.findUnique({
-            where: { tiktokVideoId },
-          });
+          const existing = existingVideosByTikTokId.get(tiktokVideoId);
 
           let videoRecordId: string;
 
@@ -166,7 +185,9 @@ export async function POST(request: NextRequest) {
               },
             });
             videoRecordId = created.id;
+            existingVideosByTikTokId.set(tiktokVideoId, created);
             newVideos++;
+            accountNewVideos++;
 
             // Analyze video with Gemini (format, hook, script, CTA)
             const analysis = await analyzeVideo({
@@ -202,7 +223,6 @@ export async function POST(request: NextRequest) {
           });
 
           videosSynced++;
-          videoCount++;
         }
 
         // Update lastPostedAt and totalVideos
@@ -210,7 +230,7 @@ export async function POST(request: NextRequest) {
           where: { id: account.id },
           data: {
             ...(latestPostedAt ? { lastPostedAt: latestPostedAt } : {}),
-            totalVideos: account.totalVideos + newVideos,
+            totalVideos: Math.max(reportedTotalVideos, account.totalVideos + accountNewVideos),
           },
         });
       } catch (err) {
@@ -234,6 +254,13 @@ export async function POST(request: NextRequest) {
         errors: errors.length > 0 ? errors : undefined,
       },
     });
+
+    await revalidateCacheTags([
+      CACHE_TAGS.sync,
+      CACHE_TAGS.videos,
+      CACHE_TAGS.appSummaries,
+      CACHE_TAGS.accountSummaries,
+    ]);
 
     return NextResponse.json({
       syncLogId,

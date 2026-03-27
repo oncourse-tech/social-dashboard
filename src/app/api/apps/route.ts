@@ -1,63 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { CACHE_TAGS, revalidateCacheTags } from "@/lib/cache";
+import { getAppOptions, getAppsSummary } from "@/lib/queries";
 
-export async function GET() {
-  const settings = await db.settings.findFirst({ where: { id: "default" } });
-  const threshold1 = settings?.viralThreshold1 ?? 5000;
-  const threshold2 = settings?.viralThreshold2 ?? 50000;
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const view = searchParams.get("view");
 
-  const apps = await db.app.findMany({
-    include: {
-      trackedAccounts: {
-        include: {
-          videos: {
-            select: { views: true, postedAt: true },
-          },
-        },
-      },
-    },
-    orderBy: { name: "asc" },
-  });
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const result = apps.map((app) => {
-    let totalFollowers = 0;
-    let totalLikes = 0;
-    let totalVideos = 0;
-    let videos7d = 0;
-    let viral5k = 0;
-    let viral50k = 0;
-
-    for (const account of app.trackedAccounts) {
-      totalFollowers += account.followers;
-      totalLikes += account.totalLikes;
-      totalVideos += account.videos.length;
-
-      for (const video of account.videos) {
-        if (video.postedAt >= sevenDaysAgo) videos7d++;
-        if (video.views >= threshold2) viral50k++;
-        else if (video.views >= threshold1) viral5k++;
-      }
-    }
-
-    return {
-      id: app.id,
-      name: app.name,
-      color: app.color,
-      url: app.url,
-      accountCount: app.trackedAccounts.length,
-      totalFollowers,
-      totalLikes,
-      totalVideos,
-      videos7d,
-      viral5k,
-      viral50k,
-    };
-  });
-
-  return NextResponse.json(result);
+  return NextResponse.json(
+    view === "options" ? await getAppOptions() : await getAppsSummary()
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -79,6 +31,12 @@ export async function POST(request: NextRequest) {
     data: { name, color, url: url || null },
   });
 
+  await revalidateCacheTags([
+    CACHE_TAGS.appOptions,
+    CACHE_TAGS.appSummaries,
+    CACHE_TAGS.accountSummaries,
+  ]);
+
   return NextResponse.json(app, { status: 201 });
 }
 
@@ -91,6 +49,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   await db.app.delete({ where: { id } });
+
+  await revalidateCacheTags([
+    CACHE_TAGS.appOptions,
+    CACHE_TAGS.appSummaries,
+    CACHE_TAGS.accountSummaries,
+    CACHE_TAGS.videos,
+  ]);
 
   return NextResponse.json({ success: true });
 }
