@@ -7,8 +7,9 @@ import { db } from "@/lib/db";
 import { SummaryCards } from "@/components/summary-cards";
 import { AppBadge } from "@/components/app-badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { AccountVideos } from "./account-videos";
 import type { VideoFormat } from "@prisma/client";
 
@@ -161,16 +162,28 @@ export default async function AccountDetailPage({
             Page {page} of {totalPages}
           </span>
           <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" disabled={page === 1}>
-              <Link href={`/accounts/${account.username}?page=${prevPage}`}>
-                Previous
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" disabled={page === totalPages}>
-              <Link href={`/accounts/${account.username}?page=${nextPage}`}>
-                Next
-              </Link>
-            </Button>
+            <Link
+              href={`/accounts/${account.username}?page=${prevPage}`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                page === 1 && "pointer-events-none opacity-50"
+              )}
+              aria-disabled={page === 1}
+              tabIndex={page === 1 ? -1 : undefined}
+            >
+              Previous
+            </Link>
+            <Link
+              href={`/accounts/${account.username}?page=${nextPage}`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                page === totalPages && "pointer-events-none opacity-50"
+              )}
+              aria-disabled={page === totalPages}
+              tabIndex={page === totalPages ? -1 : undefined}
+            >
+              Next
+            </Link>
           </div>
         </div>
       )}

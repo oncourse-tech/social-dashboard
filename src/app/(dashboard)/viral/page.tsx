@@ -129,7 +129,7 @@ function buildEngagementOrderWhere(
   }
 
   return conditions.length
-    ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
+    ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
     : Prisma.sql``;
 }
 

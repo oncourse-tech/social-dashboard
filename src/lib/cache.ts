@@ -11,5 +11,7 @@ export const CACHE_TAGS = {
 } as const;
 
 export async function revalidateCacheTags(tags: string[]) {
-  await Promise.all([...new Set(tags)].map((tag) => revalidateTag(tag)));
+  await Promise.all(
+    [...new Set(tags)].map((tag) => revalidateTag(tag, "max"))
+  );
 }
