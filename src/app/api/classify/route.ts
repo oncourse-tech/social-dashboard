@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { analyzeVideo } from "@/lib/gemini";
+import { CACHE_TAGS, revalidateCacheTags } from "@/lib/cache";
 
 // POST /api/classify — re-analyze videos with Gemini (format + hook + script + CTA)
 // ?force=true to re-analyze all, otherwise only videos with format=OTHER
@@ -50,6 +51,14 @@ export async function POST(request: Request) {
     } catch {
       failed++;
     }
+  }
+
+  if (classified > 0) {
+    await revalidateCacheTags([
+      CACHE_TAGS.videos,
+      CACHE_TAGS.appSummaries,
+      CACHE_TAGS.accountSummaries,
+    ]);
   }
 
   return NextResponse.json({

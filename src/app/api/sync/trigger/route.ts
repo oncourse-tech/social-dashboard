@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { triggerTikTokScraper } from "@/lib/apify";
+import { CACHE_TAGS, revalidateCacheTags } from "@/lib/cache";
 
 export async function POST() {
   let syncLog;
@@ -22,6 +23,8 @@ export async function POST() {
     syncLog = await db.syncLog.create({
       data: { status: "RUNNING" },
     });
+
+    await revalidateCacheTags([CACHE_TAGS.sync]);
 
     const run = await triggerTikTokScraper(usernames);
 
