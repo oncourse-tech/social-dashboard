@@ -170,3 +170,28 @@ model Settings {
   geminiApiKey   String @default("")
   syncCron       String @default("0 6 * * *")
 }
+
+model StudioChat {
+  id        String   @id @default(uuid())
+  title     String   @default("New Slideshow")
+  status    String   @default("active")
+  slug      String?
+  slides    Json?
+  manifest  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  StudioMessage[]
+
+  @@index([createdAt])
+}
+
+model StudioMessage {
+  id        String   @id @default(uuid())
+  chatId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+  chat      StudioChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
+}
