@@ -24,12 +24,21 @@ const EMPTY_SLIDES: SlideState[] = Array.from({ length: 6 }, (_, i) => ({
   status: "pending" as const,
 }));
 
-export function useSlidePolling() {
+export interface UseSlidePollingOptions {
+  initialSlug?: string | null;
+  initialSlides?: SlideState[];
+  initialManifest?: Record<string, unknown> | null;
+}
+
+export function useSlidePolling(options?: UseSlidePollingOptions) {
+  const hasInitial = options?.initialSlug && options?.initialSlides?.some(s => s.status === "ready");
   const [state, setState] = useState<SlideshowState>({
-    slug: null,
-    status: "idle",
-    slides: EMPTY_SLIDES,
-    manifest: null,
+    slug: options?.initialSlug ?? null,
+    status: hasInitial
+      ? (options!.initialSlides!.every(s => s.status === "ready") ? "complete" : "generating")
+      : "idle",
+    slides: options?.initialSlides ?? EMPTY_SLIDES,
+    manifest: options?.initialManifest ?? null,
     error: null,
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -110,6 +119,19 @@ export function useSlidePolling() {
   );
 
   useEffect(() => stopPolling, [stopPolling]);
+
+  // Auto-resume polling if initialized with incomplete slides
+  useEffect(() => {
+    if (
+      options?.initialSlug &&
+      options?.initialSlides?.some(s => s.status === "ready") &&
+      !options?.initialSlides?.every(s => s.status === "ready")
+    ) {
+      startPolling(options.initialSlug);
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return { ...state, startPolling, stopPolling, reset, setSlidesFromUrls };
 }
