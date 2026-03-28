@@ -2,15 +2,11 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ArrowUp, Sparkles, Bot, User, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
-
-const transport = new DefaultChatTransport({
-  api: "/api/studio/chat",
-});
 
 export interface SlideUrlData {
   slug: string;
@@ -18,6 +14,8 @@ export interface SlideUrlData {
 }
 
 interface ChatPanelProps {
+  chatId: string;
+  initialMessages?: Array<{ id: string; role: "user" | "assistant"; content: string }>;
   onSlugDetected: (slug: string) => void;
   onSlideUrlsDetected?: (data: SlideUrlData) => void;
   appendRef?: React.MutableRefObject<((message: string) => void) | null>;
@@ -30,8 +28,28 @@ const SLIDE_URLS_RE = /```(?:SLIDE_URLS|json)?\s*\n?([\s\S]*?\{[\s\S]*?"slides"[
 // Fallback: find raw JSON with slug + slides array
 const SLIDE_JSON_RE = /\{[^{}]*"slug"\s*:\s*"[^"]+"\s*,\s*"slides"\s*:\s*\[[\s\S]*?\]\s*\}/;
 
-export function ChatPanel({ onSlugDetected, onSlideUrlsDetected, appendRef }: ChatPanelProps) {
-  const { messages, sendMessage, status } = useChat({ transport });
+export function ChatPanel({ chatId, initialMessages, onSlugDetected, onSlideUrlsDetected, appendRef }: ChatPanelProps) {
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/studio/chat" }),
+    []
+  );
+
+  // Convert DB messages to UIMessage format for useChat
+  const hydrated = useMemo(() => {
+    if (!initialMessages?.length) return undefined;
+    return initialMessages.map((m) => ({
+      id: m.id,
+      role: m.role as "user" | "assistant",
+      parts: [{ type: "text" as const, text: m.content }],
+      createdAt: new Date(),
+    }));
+  }, [initialMessages]);
+
+  const { messages, sendMessage, status } = useChat({
+    transport,
+    initialMessages: hydrated,
+    body: { chatId },
+  });
 
   const [input, setInput] = useState("");
   const [progressPhase, setProgressPhase] = useState<string | null>(null);
