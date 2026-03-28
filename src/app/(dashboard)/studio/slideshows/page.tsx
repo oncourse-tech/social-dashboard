@@ -1,211 +1,160 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { MessageSquare, Grid2x2 } from "lucide-react";
-import { ChatPanel, type SlideUrlData } from "@/components/studio/chat-panel";
-import { PreviewPanel } from "@/components/studio/preview-panel";
-import { SlideLightbox } from "@/components/studio/slide-lightbox";
-import { EditTextsDialog } from "@/components/studio/edit-texts-dialog";
-import { FeedbackDialog } from "@/components/studio/feedback-dialog";
-import { useSlidePolling } from "@/components/studio/use-slide-polling";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Sparkles, Trash2, Loader2, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import JSZip from "jszip";
+import { formatDistanceToNow } from "date-fns";
 
-export default function SlideshowStudioPage() {
-  const slideState = useSlidePolling();
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [editTextsOpen, setEditTextsOpen] = useState(false);
-  const [regenOpen, setRegenOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "preview">("chat");
-  const appendRef = useRef<((message: string) => void) | null>(null);
+interface ChatSummary {
+  id: string;
+  title: string;
+  status: string;
+  slug: string | null;
+  slides: Array<{ index: number; url: string | null; status: string }> | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
-  const sendChatMessage = useCallback((text: string) => {
-    appendRef.current?.(text);
+export default function SlideshowsListPage() {
+  const router = useRouter();
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/studio/chats")
+      .then((res) => res.json())
+      .then(setChats)
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleSlugDetected = useCallback(
-    (slug: string) => {
-      slideState.startPolling(slug);
-    },
-    [slideState.startPolling]
-  );
+  const createChat = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/studio/chats", { method: "POST" });
+      const { id } = await res.json();
+      router.push(`/studio/slideshows/${id}`);
+    } finally {
+      setCreating(false);
+    }
+  };
 
-  const handleSlideUrlsDetected = useCallback(
-    (data: SlideUrlData) => {
-      const busted = {
-        ...data,
-        slides: data.slides.map((s) => ({
-          ...s,
-          url: s.url ? `${s.url}?t=${Date.now()}` : null,
-        })),
-      };
-      slideState.setSlidesFromUrls(busted);
-      // Auto-switch to preview on mobile when slides arrive
-      setMobileTab("preview");
-    },
-    [slideState.setSlidesFromUrls]
-  );
+  const deleteChat = async (chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setChats((prev) => prev.filter((c) => c.id !== chatId));
+    await fetch(`/api/studio/chats/${chatId}`, { method: "DELETE" });
+  };
 
-  const handleRegenerate = useCallback(
-    (feedback: string) => {
-      setRegenOpen(false);
-      const msg = feedback.trim()
-        ? `Regenerate the slideshow with this feedback: ${feedback}`
-        : "Regenerate all 6 slides for the current slideshow with fresh images.";
-      sendChatMessage(msg);
-      slideState.reset();
-      setMobileTab("chat");
-    },
-    [sendChatMessage, slideState.reset]
-  );
+  const getStatusIcon = (chat: ChatSummary) => {
+    if (chat.status === "complete") {
+      return <CheckCircle2 className="size-3.5 text-emerald-400" />;
+    }
+    if (chat.status === "active" && chat.slug) {
+      return <Loader2 className="size-3.5 animate-spin text-indigo-400" />;
+    }
+    return <Clock className="size-3.5 text-muted-foreground/40" />;
+  };
 
-  const handleEditTextsSubmit = useCallback(
-    (texts: string[], feedback: string) => {
-      setEditTextsOpen(false);
-      const textsFormatted = texts
-        .map((t, i) => `Slide ${i + 1}: "${t}"`)
-        .join("\n");
-      const feedbackPart = feedback.trim()
-        ? `\n\nAdditional feedback: ${feedback}`
-        : "";
-      sendChatMessage(
-        `Regenerate the slideshow with these updated texts:\n${textsFormatted}${feedbackPart}`
-      );
-      slideState.reset();
-      setMobileTab("chat");
-    },
-    [sendChatMessage, slideState.reset]
-  );
+  const getPreviewThumbnail = (chat: ChatSummary) => {
+    const readySlide = chat.slides?.find((s) => s.status === "ready" && s.url);
+    return readySlide?.url ?? null;
+  };
 
-  const handleDownload = useCallback(async () => {
-    const readySlides = slideState.slides.filter(
-      (s) => s.status === "ready" && s.url
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
     );
-    if (readySlides.length === 0) return;
-
-    const zip = new JSZip();
-    await Promise.all(
-      readySlides.map(async (slide) => {
-        const res = await fetch(slide.url!);
-        const blob = await res.blob();
-        zip.file(
-          `slide_${String(slide.index).padStart(2, "0")}.png`,
-          blob
-        );
-      })
-    );
-
-    const content = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(content);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slideState.slug || "slideshow"}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [slideState.slides, slideState.slug]);
-
-  const currentTexts =
-    (slideState.manifest as { texts?: string[] })?.texts ?? Array(6).fill("");
-
-  const readyCount = slideState.slides.filter(
-    (s) => s.status === "ready"
-  ).length;
+  }
 
   return (
-    <div className="-m-4 md:-m-6 flex flex-col md:flex-row h-[calc(100vh-3.5rem)] md:h-screen">
-      {/* Desktop: side-by-side */}
-      {/* Mobile: tabbed view */}
-
-      {/* Chat panel */}
-      <div
-        className={cn(
-          "md:w-[55%] md:min-w-[360px] md:border-r md:border-border/50",
-          "flex-1 min-h-0 md:flex-none",
-          mobileTab === "chat" ? "flex flex-col" : "hidden md:flex md:flex-col"
-        )}
-      >
-        <ChatPanel
-          onSlugDetected={handleSlugDetected}
-          onSlideUrlsDetected={handleSlideUrlsDetected}
-          appendRef={appendRef}
-        />
-      </div>
-
-      {/* Preview panel */}
-      <div
-        className={cn(
-          "md:w-[45%] md:min-w-[300px]",
-          "flex-1 min-h-0 md:flex-none",
-          mobileTab === "preview"
-            ? "flex flex-col"
-            : "hidden md:flex md:flex-col"
-        )}
-      >
-        <PreviewPanel
-          state={slideState}
-          onSlideClick={setLightboxIndex}
-          onRegenerate={() => setRegenOpen(true)}
-          onEditTexts={() => setEditTextsOpen(true)}
-          onDownload={handleDownload}
-        />
-      </div>
-
-      {/* Mobile tab bar */}
-      <div className="md:hidden shrink-0 flex border-t border-border/50 bg-background">
+    <div className="max-w-2xl mx-auto space-y-6 py-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Slideshows</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your slideshow generation chats
+          </p>
+        </div>
         <button
-          onClick={() => setMobileTab("chat")}
+          onClick={createChat}
+          disabled={creating}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-colors",
-            mobileTab === "chat"
-              ? "text-indigo-400 border-t-2 border-indigo-400 -mt-px"
-              : "text-muted-foreground"
+            "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all",
+            "bg-indigo-500 text-white hover:bg-indigo-600 shadow-sm shadow-indigo-500/25",
+            creating && "opacity-50 cursor-not-allowed"
           )}
         >
-          <MessageSquare className="size-4" />
-          Chat
-        </button>
-        <button
-          onClick={() => setMobileTab("preview")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-colors relative",
-            mobileTab === "preview"
-              ? "text-indigo-400 border-t-2 border-indigo-400 -mt-px"
-              : "text-muted-foreground"
+          {creating ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Plus className="size-4" />
           )}
-        >
-          <Grid2x2 className="size-4" />
-          Preview
-          {readyCount > 0 && (
-            <span className="absolute top-2 right-[calc(50%-28px)] size-4 flex items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white">
-              {readyCount}
-            </span>
-          )}
+          New Slideshow
         </button>
       </div>
 
-      {/* Modals */}
-      <SlideLightbox
-        slides={slideState.slides}
-        activeIndex={lightboxIndex}
-        onClose={() => setLightboxIndex(null)}
-        onNavigate={setLightboxIndex}
-      />
+      {chats.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-16">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 ring-1 ring-indigo-500/10">
+            <Sparkles className="size-5 text-indigo-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium text-foreground/80">No slideshows yet</p>
+            <p className="mt-1 text-xs text-muted-foreground max-w-[280px]">
+              Create your first slideshow to get started
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {chats.map((chat) => {
+            const thumb = getPreviewThumbnail(chat);
 
-      <FeedbackDialog
-        open={regenOpen}
-        onOpenChange={setRegenOpen}
-        title="Regenerate Slideshow"
-        description="Optionally describe what to change. Leave empty to regenerate with the same concept."
-        submitLabel="Regenerate"
-        onSubmit={handleRegenerate}
-      />
+            return (
+              <button
+                key={chat.id}
+                onClick={() => router.push(`/studio/slideshows/${chat.id}`)}
+                className="group w-full flex items-center gap-3 rounded-xl border border-border/60 p-3 transition-all hover:border-border hover:bg-muted/30 text-left"
+              >
+                {/* Thumbnail or placeholder */}
+                <div className="size-12 shrink-0 rounded-lg overflow-hidden bg-muted/50 ring-1 ring-white/[0.06]">
+                  {thumb ? (
+                    <img src={thumb} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="size-full flex items-center justify-center">
+                      <Sparkles className="size-4 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
 
-      <EditTextsDialog
-        open={editTextsOpen}
-        onOpenChange={setEditTextsOpen}
-        initialTexts={currentTexts}
-        onSubmit={handleEditTextsSubmit}
-      />
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(chat)}
+                    <span className="text-sm font-medium truncate">
+                      {chat.title}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })}
+                  </p>
+                </div>
+
+                {/* Delete */}
+                <button
+                  onClick={(e) => deleteChat(chat.id, e)}
+                  className="shrink-0 p-1.5 rounded-md text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
