@@ -114,10 +114,11 @@ export default function SlideshowsListPage() {
             const thumb = getPreviewThumbnail(chat);
 
             return (
-              <button
+              <div
                 key={chat.id}
                 onClick={() => router.push(`/studio/slideshows/${chat.id}`)}
-                className="group w-full flex items-center gap-3 rounded-xl border border-border/60 p-3 transition-all hover:border-border hover:bg-muted/30 text-left"
+                role="button"
+                className="group w-full flex items-center gap-3 rounded-xl border border-border/60 p-3 transition-all hover:border-border hover:bg-muted/30 text-left cursor-pointer"
               >
                 {/* Thumbnail or placeholder */}
                 <div className="size-12 shrink-0 rounded-lg overflow-hidden bg-muted/50 ring-1 ring-white/[0.06]">
@@ -150,7 +151,7 @@ export default function SlideshowsListPage() {
                 >
                   <Trash2 className="size-3.5" />
                 </button>
-              </button>
+              </div>
             );
           })}
         </div>
