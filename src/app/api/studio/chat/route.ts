@@ -3,6 +3,7 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
+import { db } from "@/lib/db";
 
 export const maxDuration = 300;
 
@@ -31,13 +32,34 @@ function extractText(msg: UIMessage): string {
 }
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  const { messages, chatId }: { messages: UIMessage[]; chatId?: string } =
+    await req.json();
+
+  // Persist the latest user message if chatId is provided
+  if (chatId && messages.length > 0) {
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === "user") {
+      await db.studioMessage.create({
+        data: {
+          chatId,
+          role: "user",
+          content: extractText(lastMsg),
+        },
+      });
+      await db.studioChat.update({
+        where: { id: chatId },
+        data: { updatedAt: new Date() },
+      });
+    }
+  }
 
   const input = messages.map((msg) => ({
     type: "message" as const,
     role: msg.role,
     content: extractText(msg),
   }));
+
+  let fullResponse = "";
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -58,7 +80,6 @@ export async function POST(req: Request) {
         }
       );
 
-      // Send start event so useChat creates the assistant message
       writer.write({ type: "start" });
 
       if (!response.ok) {
@@ -88,7 +109,6 @@ export async function POST(req: Request) {
           try {
             const parsed = JSON.parse(data);
 
-            // OpenResponses text deltas — real streaming
             if (parsed.type === "response.output_text.delta" && parsed.delta) {
               if (!textStarted) {
                 writer.write({ type: "text-start", id: textId });
@@ -99,9 +119,9 @@ export async function POST(req: Request) {
                 id: textId,
                 delta: parsed.delta,
               });
+              fullResponse += parsed.delta;
             }
 
-            // Fallback: chat completions format
             if (parsed.choices?.[0]?.delta?.content) {
               if (!textStarted) {
                 writer.write({ type: "text-start", id: textId });
@@ -112,6 +132,7 @@ export async function POST(req: Request) {
                 id: textId,
                 delta: parsed.choices[0].delta.content,
               });
+              fullResponse += parsed.choices[0].delta.content;
             }
           } catch {
             // Skip unparseable
@@ -123,6 +144,33 @@ export async function POST(req: Request) {
         writer.write({ type: "text-end", id: textId });
       }
       writer.write({ type: "finish", finishReason: "stop" });
+
+      // Persist the assistant response after stream completes
+      if (chatId && fullResponse) {
+        await db.studioMessage.create({
+          data: {
+            chatId,
+            role: "assistant",
+            content: fullResponse,
+          },
+        });
+
+        // Auto-title: set title from first user message if still default
+        const chat = await db.studioChat.findUnique({
+          where: { id: chatId },
+          select: { title: true },
+        });
+        if (chat?.title === "New Slideshow" && messages.length > 0) {
+          const firstUserMsg = messages.find((m) => m.role === "user");
+          if (firstUserMsg) {
+            const title = extractText(firstUserMsg).slice(0, 50).trim() || "New Slideshow";
+            await db.studioChat.update({
+              where: { id: chatId },
+              data: { title },
+            });
+          }
+        }
+      }
     },
     onError: (error) => {
       return error instanceof Error ? error.message : String(error);
