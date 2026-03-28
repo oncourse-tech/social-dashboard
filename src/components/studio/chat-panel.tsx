@@ -30,8 +30,11 @@ const SLIDE_JSON_RE = /\{[^{}]*"slug"\s*:\s*"[^"]+"\s*,\s*"slides"\s*:\s*\[[\s\S
 
 export function ChatPanel({ chatId, initialMessages, onSlugDetected, onSlideUrlsDetected, appendRef }: ChatPanelProps) {
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/studio/chat" }),
-    []
+    () => new DefaultChatTransport({
+      api: "/api/studio/chat",
+      body: { chatId },
+    }),
+    [chatId]
   );
 
   // Convert DB messages to UIMessage format for useChat
@@ -47,8 +50,7 @@ export function ChatPanel({ chatId, initialMessages, onSlugDetected, onSlideUrls
 
   const { messages, sendMessage, status } = useChat({
     transport,
-    initialMessages: hydrated,
-    body: { chatId },
+    messages: hydrated,
   });
 
   const [input, setInput] = useState("");
